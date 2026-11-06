@@ -46,7 +46,11 @@ for (const s of old) {
   if (!kinds.length) continue
   hedged++
   const keys = ticks(s.text)
-  const match = now.find((n) => {
+  const product = /references\/([a-z-]+?)(?:-workers)?\.md$/.exec(s.file)?.[1]
+  const home = `${CONTRACT}adapters/${product}/`
+  const candidates = [...now.filter((n) => n.file.startsWith(home)), ...now.filter((n) => !n.file.startsWith(home))]
+  const exact = candidates.find((n) => n.text.replace(/^- /, '').trim() === s.text.replace(/^- /, '').trim())
+  const match = exact ?? candidates.find((n) => {
     if (!kinds.every((k) => hedgesOf(n.text).includes(k))) return false
     if (keys.length) return keys.every((k) => n.text.includes(k))
     const w = words(s.text)
