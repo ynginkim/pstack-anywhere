@@ -3,8 +3,9 @@
 // Usage: node scripts/lint-rewritten.mjs
 
 import { execFileSync } from 'node:child_process'
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { PRODUCT_FREE, PRODUCT_PATTERNS, trackedFiles } from './product-patterns.mjs'
 
 const root = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim()
 const { paths } = JSON.parse(readFileSync(join(root, 'scripts/rewritten.json'), 'utf8'))
@@ -29,47 +30,22 @@ const BANNED = [
   [/pstack-models|role lines?\b/, 'the retired role table'],
 ]
 
-// The seven cross-model skills, the playbooks, and the poteto-mode references name capabilities (skills/resolve-capability) and no harness, tool, or command.
-// The adapter, the generator, poteto-mode, and setup-pstack are outside this list because they have to name products.
-const CAPABILITY_ONLY = [
-  'skills/arena/', 'skills/swarm/', 'skills/interrogate/', 'skills/reflect/', 'skills/architect/', 'skills/how/', 'skills/why/',
-  'skills/poteto-mode/playbooks/', 'skills/poteto-mode/references/',
-]
-
-const NO_PRODUCT = [
-  [/\b(spawn_agent|spawn_subagent|AskUserQuestion|TodoWrite|update_plan|run_in_background|subagent_type|skill-creator|SendMessage|TaskStop|CronCreate|ScheduleWakeup|worker-(start|show|read|stop|release))\b/, 'a harness tool or Orca command'],
-  [/\borca\b/i, 'Orca'],
-  [/\bClaude\b|\bCodex\b|\bGrok\b/i, 'an agent product'],
-  [/`(Agent|Explore|Plan)`|\bAgent tool\b/, 'a harness tool'],
-  [/`gh( [^`]*)?`|\bgh (pr|api|issue|run)\b/, 'a gh command'],
-  [/\.(claude|grok)\/|\bCLAUDE\.md\b|\bAGENTS\.md\b|\$CLAUDE_CONFIG_DIR|\$CODEX_HOME|~\/\.(claude|codex|grok)\b/, 'a product path'],
-]
-
-function* files(dir) {
-  for (const name of readdirSync(dir)) {
-    const p = join(dir, name)
-    if (statSync(p).isDirectory()) yield* files(p)
-    else if (/\.(md|mjs|js|sh|json|ya?ml|toml)$/.test(name)) yield p
-  }
-}
 
 // A rewritten skill may keep a block of old wording between these markers while the skills it routes to are still being rewritten.
 const TRANSITION = /<!-- transition:start -->[\s\S]*?<!-- transition:end -->/g
 
 const hits = []
-for (const rel of paths) {
-  const target = join(root, rel)
-  const list = statSync(target).isDirectory() ? [...files(target)] : [target]
-  for (const file of list) {
-    readFileSync(file, 'utf8')
-      .replace(TRANSITION, (block) => block.replace(/[^\n]/g, ''))
-      .split('\n')
-      .forEach((text, i) => {
-        const capabilityOnly = CAPABILITY_ONLY.some((x) => file.startsWith(join(root, x)))
-        if (capabilityOnly) for (const [re, why] of NO_PRODUCT) if (re.test(text)) hits.push(`${file.slice(root.length + 1)}:${i + 1}  ${why} (name a capability instead): ${text.trim().slice(0, 100)}`)
-        for (const [re, why, exempt = []] of BANNED) if (re.test(text) && !exempt.some((x) => file.startsWith(join(root, x)))) hits.push(`${file.slice(root.length + 1)}:${i + 1}  ${why}: ${text.trim().slice(0, 100)}`)
-      })
-  }
+for (const file of trackedFiles(root, paths)) {
+  const productFree = PRODUCT_FREE.some((x) => file.startsWith(x))
+  // The bundled TypeScript pages through GitHub's GraphQL with a `cursor`, which is not the product.
+  const cursorRules = !file.endsWith('.ts')
+  readFileSync(join(root, file), 'utf8')
+    .replace(TRANSITION, (block) => block.replace(/[^\n]/g, ''))
+    .split('\n')
+    .forEach((text, i) => {
+      if (productFree) for (const [re, why] of PRODUCT_PATTERNS) if (re.test(text)) hits.push(`${file}:${i + 1}  ${why} (name a capability instead): ${text.trim().slice(0, 100)}`)
+      if (cursorRules) for (const [re, why, exempt = []] of BANNED) if (re.test(text) && !exempt.some((x) => file.startsWith(x))) hits.push(`${file}:${i + 1}  ${why}: ${text.trim().slice(0, 100)}`)
+    })
 }
 
 if (hits.length) {
