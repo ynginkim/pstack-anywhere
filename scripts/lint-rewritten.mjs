@@ -18,7 +18,7 @@ const ADAPTER = ['skills/resolve-capability/']
 const ADAPTER_REFERENCES = ['skills/resolve-capability/references/']
 
 const BANNED = [
-  [/\bcursor/i, 'the word Cursor', [...CATALOG, ...ADAPTER_REFERENCES]],
+  [/\bcursor/i, 'the word Cursor', [...CATALOG, ...ADAPTER_REFERENCES, 'skills/resolve-capability/adapters/orca/']],
   [/\.mdc\b/, '.mdc rule file'],
   [/\bAskQuestion\b/, 'AskQuestion'],
   [/`Task`|\bTask (tool|subagent|call)\b/, 'the Task tool'],
