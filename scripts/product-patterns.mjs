@@ -13,13 +13,20 @@ export const PRODUCT_PATTERNS = [
   [/\.(claude|grok)\/|\bCLAUDE\.md\b|\bAGENTS\.md\b|\$CLAUDE_CONFIG_DIR|\$CODEX_HOME|~\/\.(claude|codex|grok)\b/, 'a product path'],
 ]
 
+export const CONTRACT = 'skills/resolve-capability/'
+export const ADAPTERS = 'skills/resolve-capability/adapters/'
+
+// The stub keeps old links to the Orca worker reference alive until phase 3 regenerates select-model.
+export const TRANSITIONAL = new Set(['skills/resolve-capability/references/orca-workers.md'])
+
+// The contract outside adapters/, the seven cross-model skills, the playbooks, and the poteto-mode references.
+// Later phases of docs/harness-adapters-design.md widen this to all of skills/.
 export const PRODUCT_FREE = [
-  'skills/arena/', 'skills/swarm/', 'skills/interrogate/', 'skills/reflect/', 'skills/architect/', 'skills/how/', 'skills/why/',
+  CONTRACT, 'skills/arena/', 'skills/swarm/', 'skills/interrogate/', 'skills/reflect/', 'skills/architect/', 'skills/how/', 'skills/why/',
   'skills/poteto-mode/playbooks/', 'skills/poteto-mode/references/',
 ]
 
-export const CONTRACT = 'skills/resolve-capability/'
-export const ADAPTERS = 'skills/resolve-capability/adapters/'
+export const isProductFree = (file) => PRODUCT_FREE.some((x) => file.startsWith(x)) && !file.startsWith(ADAPTERS) && !TRANSITIONAL.has(file)
 
 export const TEXT_FILE = /\.(md|mjs|js|ts|sh|json|ya?ml|toml)$/
 

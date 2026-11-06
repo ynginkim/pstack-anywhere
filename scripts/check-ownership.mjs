@@ -7,7 +7,7 @@
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { ADAPTERS, CONTRACT, PRODUCT_FREE, PRODUCT_PATTERNS, TEXT_FILE, trackedFiles } from './product-patterns.mjs'
+import { ADAPTERS, CONTRACT, PRODUCT_FREE, PRODUCT_PATTERNS, TEXT_FILE, TRANSITIONAL, trackedFiles } from './product-patterns.mjs'
 
 const root = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim()
 const args = process.argv.slice(2)
@@ -20,9 +20,6 @@ const files = ref
   : trackedFiles(root, ['skills'])
 const read = (f) => (ref ? execFileSync('git', ['show', `${ref}:${f}`], { cwd: root, encoding: 'utf8' }) : readFileSync(join(root, f), 'utf8'))
 const lines = new Map(files.map((f) => [f, read(f).split('\n')]))
-
-// The stub keeps old links to the Orca worker reference alive until phase 3 regenerates select-model.
-const TRANSITIONAL = new Set(['skills/resolve-capability/references/orca-workers.md'])
 
 const ORCA = PRODUCT_PATTERNS.find(([, why]) => why === 'Orca')[0]
 const SCOPES = ['own harness', 'every harness', 'target product', 'contract']
@@ -62,7 +59,7 @@ function check() {
   const owners = new Map()
   for (const a of adapters) for (const t of a.owns) owners.set(t.key, [...(owners.get(t.key) ?? []), a])
 
-  const inScope = (f) => f.startsWith(CONTRACT) || PRODUCT_FREE.some((x) => f.startsWith(x))
+  const inScope = (f) => PRODUCT_FREE.some((x) => f.startsWith(x))
   let scanned = 0
   for (const [f, text] of lines) {
     if (!inScope(f) || TRANSITIONAL.has(f)) continue

@@ -14,8 +14,10 @@ jobs:
           fetch-depth: 0
       - name: Every orca command we reference exists in the snapshotted Orca
         run: node scripts/check-orca-commands.mjs
-      - name: Hand-rewritten skills carry no Cursor wording
+      - name: Hand-rewritten skills carry no Cursor wording, and the contract names no product
         run: node scripts/lint-rewritten.mjs
+      - name: Each product's names stay in its adapter, and the adapters keep to the contract
+        run: node scripts/check-ownership.mjs
       - name: CURSOR-DEPENDENCIES.md holds no row for a rewritten path and its counts are current
         run: node scripts/prune-cursor-deps.mjs --check
       - uses: oven-sh/setup-bun@v2
