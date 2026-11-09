@@ -16,15 +16,12 @@ export const PRODUCT_PATTERNS = [
 export const CONTRACT = 'skills/resolve-capability/'
 export const ADAPTERS = 'skills/resolve-capability/adapters/'
 
-// The stub keeps old links to the Orca worker reference alive until phase 3 regenerates select-model.
-export const TRANSITIONAL = new Set(['skills/resolve-capability/references/orca-workers.md'])
-
 // All of skills/ outside the adapters. The repository's own name, pstack-orca, is not a product name.
 export const PRODUCT_FREE = ['skills/']
 
 export const inProductScope = (file) => PRODUCT_FREE.some((x) => file.startsWith(x))
 
-export const isProductFree = (file) => inProductScope(file) && !file.startsWith(ADAPTERS) && !TRANSITIONAL.has(file)
+export const isProductFree = (file) => inProductScope(file) && !file.startsWith(ADAPTERS)
 
 export const TEXT_FILE = /\.(md|mjs|js|ts|sh|json|ya?ml|toml)$/
 

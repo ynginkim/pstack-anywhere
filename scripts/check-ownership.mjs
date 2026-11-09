@@ -7,7 +7,7 @@
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { ADAPTERS, CONTRACT, PRODUCT_FREE, PRODUCT_PATTERNS, TEXT_FILE, TRANSITIONAL, inProductScope, trackedFiles } from './product-patterns.mjs'
+import { ADAPTERS, CONTRACT, PRODUCT_FREE, PRODUCT_PATTERNS, TEXT_FILE, inProductScope, trackedFiles } from './product-patterns.mjs'
 
 const root = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim()
 const args = process.argv.slice(2)
@@ -62,7 +62,7 @@ function check() {
   const inScope = inProductScope
   let scanned = 0
   for (const [f, text] of lines) {
-    if (!inScope(f) || TRANSITIONAL.has(f)) continue
+    if (!inScope(f)) continue
     scanned++
     const home = adapters.find((a) => f.startsWith(a.dir))
     const launching = home?.kind === 'environment' && f === home.file ? sectionLines(text, 'Launching harnesses') : new Set()
