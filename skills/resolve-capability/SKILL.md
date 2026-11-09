@@ -44,7 +44,7 @@ Each capability in the index has a scope. The scope says whose mechanism answers
 - `spawn-worker` (target product): an asynchronous worker on another agent product, with a report. Any session with a shell can start another product's CLI headless, as [`references/cli-workers.md`](references/cli-workers.md) says. An environment can add supervision and a durable run. Read the target's adapter, and each environment adapter that applies, before the first start and when you plan one, because they say which model and effort flags each way of starting takes. Fallback: when the other product is not installed, not logged in, or has no adapter, run the seat on your own model and say in one line which product would run it.
 - `isolate-checkout` (own harness): its own worktree, ports, and temp paths for a seat that writes. Fallback: `git worktree add` by hand, and remove it with the exact step.
 - `run-remote` (own harness): a run that survives this computer sleeping. Fallback: run here and say that it ends with this session.
-- `coordinate-workers` (own harness): dispatch, dependencies, an inbox, and decision gates. Fallback: the `orch` tool in `../poteto-mode/scripts/orch/` (needs `bun`). The verification ledger always stays on `orch`.
+- `coordinate-workers` (own harness): dispatch, dependencies, an inbox, and decision gates. Fallback: one tracker file in `durable-store` with a line per unit (its owner, state, PR, head SHA, and verdict), or the plan in the reply. Verdicts always stay in that file.
 - `control-agent` (own harness): probe, message, stop, or replace an agent. Fallback: say the agent cannot be probed.
 - `choose-model` (contract): which model and effort for a seat. Read `select-model`. When it is missing, use the defaults in `../poteto-mode/SKILL.md`. No fallback is needed.
 
@@ -79,7 +79,7 @@ Each capability in the index has a scope. The scope says whose mechanism answers
 
 ## 4. Bundled tools are not capabilities
 
-`../poteto-mode/scripts/` ships tools that run the same everywhere: `orch` (units, the verification ledger, the frontier), `watch-pr` (the READY, WAITING, ADVANCE, COMPLETE verdict for a PR), `check-plan.mjs`, and `worktree-audit.sh`. Several need `bun`. A step that uses one names it. Only the waiting is a capability: use `wake-on-event`.
+`../poteto-mode/scripts/` ships tools that run the same everywhere: `watch-pr` (the READY, WAITING, ADVANCE, COMPLETE verdict for a PR), `check-plan.mjs`, and `worktree-audit.sh`. Several need `bun`. A step that uses one names it. Only the waiting is a capability: use `wake-on-event`.
 
 ## 5. When to read this again
 

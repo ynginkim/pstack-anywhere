@@ -40,7 +40,6 @@
     "skills/poteto-mode/references/review-bot-triage.md",
     "skills/poteto-mode/scripts/check-plan.mjs",
     "skills/poteto-mode/scripts/worktree-audit.sh",
-    "skills/poteto-mode/scripts/orch/",
     "skills/poteto-mode/scripts/watch-pr/",
     "skills/poteto-mode/scripts/bootstrap.ts",
     "skills/poteto-mode/scripts/package.json",
@@ -55,6 +54,7 @@
     "docs/harness/",
     ".cursor-plugin/",
     "README.md",
-    "skills/poteto-mode/references/bugbot-triage.md"
+    "skills/poteto-mode/references/bugbot-triage.md",
+    "skills/poteto-mode/scripts/orch/"
   ]
 }

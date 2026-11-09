@@ -23,7 +23,7 @@ Overrides. `worker-start --on <saved environment>`. List the environments with `
 
 ### `coordinate-workers`
 
-Overrides. `orca orchestration run-create`, `task-create`, `gate-create`, `check --wait` (see [`references/workers.md`](references/workers.md)). The verification ledger always stays on `orch`.
+Overrides. `orca orchestration run-create`, `task-create`, `gate-create`, `check --wait` (see [`references/workers.md`](references/workers.md)). Verdicts stay in the program's tracker file in `durable-store`, as the contract says.
 
 ### `control-agent`
 
