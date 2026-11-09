@@ -8,6 +8,7 @@ A user types `/poteto-mode` (or `$poteto-mode` in Codex) with a task. The agent 
 - `entry-copy` opens `skills/poteto-mode/playbooks/<title>.md` and copies its numbered steps verbatim as the first todo items. A step it will not do stays with `skip: <reason>`.
 - `entry-hold` starts no subagent, no Orca worker, and no investigation, and changes no file.
 - `entry-todo-tool` uses the plan tool the harness has (`TodoWrite` in Claude Code, `update_plan` in Codex), or a list in the reply when it has none.
+- `entry-detect` makes `sh <pstack>/resolve-capability/scripts/detect.sh` its first tool call (or one of the calls sent with the first), and reads the harness adapter whose Detect matches it. The entry prompt plans no spawn, so this catches a session that ties detection to planning one.
 
 ## How to get to it (user POV)
 

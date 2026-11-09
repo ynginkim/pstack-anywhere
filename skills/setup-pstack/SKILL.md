@@ -5,7 +5,7 @@ description: Set pstack up for this user and this computer. Generates the `selec
 
 # Setup pstack
 
-pstack does not ship a model table. It generates `select-model`, a skill under `~/.agents/skills/select-model/` that holds this user's preferences and this computer's agents and models. Claude Code, Codex, and Grok read it by that path at the start of a task. Nothing loads it for them. The generator can also link it into the skill folders of the products that list skills from their own folder, as the `skills` CLI does, and asks first.
+pstack does not ship a model table. It generates `select-model`, a skill under `~/.agents/skills/select-model/` that holds this user's preferences and this computer's agents and models. Every harness with an adapter reads it by that path at the start of a task. Nothing loads it for them. The generator can also link it into the skill folders of the harnesses that list skills from their own folder (`locate` gives each), as the `skills` CLI does, and asks first.
 
 ## Steps
 
@@ -21,9 +21,9 @@ Run the **create-model-selection-skill** skill by reading its `SKILL.md` next to
 
 Repeat the generator's hand-over in two sentences: where the skill is, and that the next task reads it. Say how to change it: edit a sentence under `## Preferences` in that file, or run `/setup-pstack` again.
 
-When a product on this computer cannot run from this session, say which environment starts it. Orca starts Claude, Codex, and other products as workers. A plain Claude Code or Codex session starts only its own models.
+When a product on this computer cannot run from this session, say which environment starts it. The Launching harnesses section of each environment adapter says which products it starts. Without an environment, a session starts another product only through that product's own CLI, as its adapter's Start me from outside section says.
 
-When Grok is among the products, say that Orca starts Grok on the `[models] default` in `~/.grok/config.toml` and refuses model and effort flags, so the model it runs is the one in that file. To change it, edit the file.
+When an environment adapter's Launching harnesses says the environment refuses a product's model or effort flags, say so, and say which file sets the model that product runs there and that the user changes it in that file.
 
 ### 4. Offer a verification skill (optional)
 

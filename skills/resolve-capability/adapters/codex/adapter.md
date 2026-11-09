@@ -37,7 +37,7 @@ The desktop app has scheduled tasks (documented, unverified). The Codex CLI has 
 
 ### `find-sessions`
 
-`$CODEX_HOME/sessions/YYYY/MM/DD/rollout-*.jsonl`, filtered on `payload.cwd`. `CODEX_HOME` is `~/.codex` unless something set it. Tool calls are `function_call` and `custom_tool_call` items. `history.jsonl` in `CODEX_HOME` is not a rollout. To pick your own session out of the files, read the first user message after `session_meta`. Live sessions: `codex agents`.
+`$CODEX_HOME/sessions/YYYY/MM/DD/rollout-*.jsonl`, filtered on `payload.cwd`. `CODEX_HOME` is `~/.codex` unless something set it. Tool calls are `function_call` and `custom_tool_call` items. `history.jsonl` in `CODEX_HOME` is not a rollout. To pick your own session out of the files, read the first user message after `session_meta`. Live sessions: `codex agents`. For `worktree-audit.sh`: `--store "${CODEX_HOME:-$HOME/.codex}/sessions"`.
 
 ### `locate`
 
@@ -60,6 +60,10 @@ Your tool list, or `codex mcp list`. Seen on 2026-10-27 with Codex 0.160.1: Code
 ## For users
 
 - `$name` runs a skill.
+- The `skills` CLI id is `codex`. Codex reads `~/.agents/skills/` directly.
+- It may load any skill from its description.
+- Skills documentation: https://developers.openai.com/codex/skills
+- `$skill-creator` writes skills, `/plan` plans before edits, and the Codex app has scheduled tasks.
 
 ## Limits
 

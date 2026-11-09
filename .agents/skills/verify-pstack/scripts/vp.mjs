@@ -940,7 +940,10 @@ function launch(args) {
   const lock = readLock()
   if (lock && lock.owner !== me && !opt['ignore-lock']) die(`select-model lock ${describeLock(lock)}. Your run would read their state. Wait, or pass --ignore-lock if your run never reads select-model`, 3)
   const stamp = new Date()
-  const id = `${label}-${String(stamp.getHours()).padStart(2, '0')}${String(stamp.getMinutes()).padStart(2, '0')}${String(stamp.getSeconds()).padStart(2, '0')}`
+  const hhmmss = `${String(stamp.getHours()).padStart(2, '0')}${String(stamp.getMinutes()).padStart(2, '0')}${String(stamp.getSeconds()).padStart(2, '0')}`
+  // Two launches of one label in the same second would share a run folder and a marker.
+  let id = `${label}-${hhmmss}`
+  for (let n = 2; exists(runDir(id)); n++) id = `${label}-${hhmmss}-${n}`
   const marker = `[${id}]`
   if (opt.prompt.includes('{home}') && !opt.fakehome) die('the prompt uses {home}, so pass --fakehome <dir> (make one with vp fakehome)')
   if (opt.fakehome && !exists(opt.fakehome)) die(`no fake home at ${opt.fakehome}`)

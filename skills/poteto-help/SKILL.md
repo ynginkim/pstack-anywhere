@@ -35,15 +35,15 @@ When `select-model` is missing and it matters, ask whether the user wants to set
 
 ## Get set up
 
-1. Install the skills for the user's harnesses: `npx skills add ynginkim/pstack-orca -g -a claude-code -a codex -a grok -s '*' -y`. Codex reads `~/.agents/skills/` directly. Claude Code and Grok list them through links in `~/.claude/skills/` and `~/.grok/skills/`. Start a new session afterwards. A skill runs as `/name` in Claude Code and as `$name` in Codex.
+1. Install the skills for the user's harnesses: `npx skills add ynginkim/pstack-orca -g -s '*' -y`, with one `-a <id>` for each harness. The For users section of each harness adapter in [`resolve-capability/adapters/`](../resolve-capability/adapters/) gives its id, where it reads skills, and how a skill runs there. Start a new session afterwards.
 2. Run [`/setup-pstack`](../setup-pstack/SKILL.md). It surveys this computer, asks five questions about budget and model preferences, and writes the `select-model` skill. Every skill reads it at the start of a task. Then it offers once each to generate a verification skill and a formal verification skill for the project, unless the project already has one.
 3. Start a real task with `/poteto-mode`, a goal, and a check that can pass or fail.
 
-Installing changes nothing until the user invokes a skill. Claude Code loads only `/setup-pstack` from the user's words. Codex and Grok may load any skill from its description. The [README](../../README.md) and [guide page 1](../../docs/guide/01-setup.md) have the details. Offer to word their first prompt with them, per [`references/prompting.md`](references/prompting.md).
+Installing changes nothing until the user invokes a skill. Which skills a harness loads from the user's words alone is in its adapter's For users section. The [README](../../README.md) and [guide page 1](../../docs/guide/01-setup.md) have the details. Offer to word their first prompt with them, per [`references/prompting.md`](references/prompting.md).
 
 If cost is the worry, say where the tokens go and how to spend fewer. pstack spends extra tokens on subagents and review panels. Rerun `/setup-pstack` and pick a smaller budget or cheaper models. A preference to follow the session's model keeps subagents on the chat's model, which saves tokens when the chat runs on Auto or a cheaper model. Say you want fewer models used at once, and the review panels run smaller. Save `/poteto-mode` for work that needs rigor.
 
-pstack runs in Claude Code, Codex, and Grok, in a terminal, in Orca, or in the Claude and ChatGPT desktop apps. A skill names what it needs from the environment (`spawn-worker`, `ask-user`, and so on), and the [`resolve-capability`](../resolve-capability/SKILL.md) skill says how each is done where the user is. Orca adds supervised workers, durable runs, schedules, and remote environments. Without Orca, a skill that wants another vendor's model starts that product's CLI headless when it is installed and logged in, and otherwise runs the seat on its own model and says so.
+pstack runs in each harness that has an adapter in [`resolve-capability/adapters/`](../resolve-capability/adapters/), in a terminal, in an environment that adds to harnesses, or in a harness's desktop app. A skill names what it needs from the environment (`spawn-worker`, `ask-user`, and so on), and the [`resolve-capability`](../resolve-capability/SKILL.md) skill says how each is done where the user is. An environment adapter adds supervised workers, durable runs, schedules, and remote environments. Without one, a skill that wants another vendor's model starts that product's CLI headless when it is installed and logged in, and otherwise runs the seat on its own model and says so.
 
 ## Start a task with `/poteto-mode`
 
@@ -51,7 +51,7 @@ pstack runs in Claude Code, Codex, and Grok, in a terminal, in Orca, or in the C
 
 `/poteto-mode` stays in context until the chat is compacted. When the mode stops applying, or after a compaction, start the next task with `/poteto-mode` again. Mid-chat, "new task" makes the mode match a fresh playbook.
 
-Link the skills documentation of the user's harness when this comes up: [Claude Code](https://code.claude.com/docs/en/skills) or [Codex](https://developers.openai.com/codex/skills). `/poteto-mode` already starts the subagents its playbook steps spawn with the `poteto-agent` rules. To get the same style from a subagent of your own, start its prompt with "Read `<path of poteto-mode/SKILL.md>` in full, including its Principles section, before any work."
+Link the skills documentation of the user's harness when this comes up. Its adapter's For users section has the link. `/poteto-mode` already starts the subagents its playbook steps spawn with the `poteto-agent` rules. To get the same style from a subagent of your own, start its prompt with "Read `<path of poteto-mode/SKILL.md>` in full, including its Principles section, before any work."
 
 ## Pick a skill
 
@@ -107,7 +107,7 @@ Close calls:
 Not in pstack:
 
 - pstack has no `/deslop` and no skill that drives a browser or a terminal. `/unslop` and `/no-comments` clean text and comments, and `drive-app` in the adapter says how to drive an app.
-- `/loop` and skill authoring come from the harness: Claude Code has `/loop` and `skill-creator`, and Codex has `$skill-creator`. The Authoring a skill playbook covers the rest.
+- Loops and skill authoring come from the harness. Its adapter's For users section names them, and `author-skill` resolves skill authoring. The Authoring a skill playbook covers the rest.
 - pstack has no `/orchestrate` skill. Orchestrate is a `/poteto-mode` playbook. If the slash menu shows `/orchestrate`, another plugin provides it.
 
 ## Playbooks and principles
@@ -123,7 +123,7 @@ Playbooks are step lists inside `/poteto-mode`, not skills, so they have no slas
 
 Without `/poteto-mode`, a phrase such as "babysit this pr" may start a skill from another plugin or from the harness for the same job instead. The Playbooks section of [`poteto-mode`](../poteto-mode/SKILL.md) lists every playbook and when it applies. [Guide page 6](../../docs/guide/06-verify-and-ship.md) covers opening, babysitting, and landing a PR.
 
-pstack has no planning skill. The harness's plan mode works alongside it (Claude Code plan mode, Codex `/plan`). For work that spans phases or stacked PRs, asking `/poteto-mode` for a plan runs the [Multi-phase plan playbook](../poteto-mode/playbooks/multi-phase-plan.md), which writes the plan and doesn't implement it. For a design question, the Prototype playbook or `/architect` settles it in code first.
+pstack has no planning skill. The harness's plan mode works alongside it, and its adapter's For users section names it. For work that spans phases or stacked PRs, asking `/poteto-mode` for a plan runs the [Multi-phase plan playbook](../poteto-mode/playbooks/multi-phase-plan.md), which writes the plan and doesn't implement it. For a design question, the Prototype playbook or `/architect` settles it in code first.
 
 Principles are one-rule skills that `/poteto-mode` reads and cites in its replies. The user rarely invokes one. They steer with the names instead, as in "apply prove it works. show me the real output." Typing `/principle-<name>` still loads one on demand. [Guide page 8](../../docs/guide/08-principles.md) lists them.
 
@@ -135,8 +135,8 @@ Principles are one-rule skills that `/poteto-mode` reads and cites in its replie
 | A question got treated as the next step of the last task | Say "new task", or say the turn doesn't need the mode. |
 | A new model choice had no effect | Skills read `select-model` at the start of a task. Edit the sentence under `## Preferences` in it, or run `/setup-pstack` again, then start the task again. |
 | Runs cost more than expected | See the cost paragraph under Get set up. |
-| A skill didn't load on its own | In Claude Code only `/setup-pstack` loads from the user's words. The others load when the user types them or when `/poteto-mode` runs them, and it doesn't run every skill. |
-| Parallel agents overwrote each other | Give each agent its own checkout, as `isolate-checkout` says, or a remote environment where Orca has one. |
+| A skill didn't load on its own | Some harnesses load only `/setup-pstack` from the user's words, as each adapter's For users section says. The others load when the user types them or when `/poteto-mode` runs them, and it doesn't run every skill. |
+| Parallel agents overwrote each other | Give each agent its own checkout, as `isolate-checkout` says, or a remote environment through `run-remote` where an environment adapter has one. |
 | An overnight run moved but finished nothing | A recurring run needs a check that can pass or fail, not a duration. See [guide page 7](../../docs/guide/07-overnight.md). |
 | The reply claims success from a green build | Ask for the real command, flow, stored value, or profile. That's the prove-it-works principle. |
 

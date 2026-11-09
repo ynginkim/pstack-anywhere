@@ -49,7 +49,7 @@ Use the plan or todo tool if your tool list has one. Otherwise keep the list in 
 
 ### `find-sessions`
 
-`<config dir>/projects/<workspace folder>/<session>.jsonl`. The config dir is `$CLAUDE_CONFIG_DIR` when it is set, otherwise `~/.claude`. The workspace folder is the absolute path with `/` and `.` replaced by `-`. Tool calls are `tool_use` blocks in `assistant` messages. To pick your own session out of the files, read the first `user` record's `message.content`. Live sessions: `ListAgents` and `claude agents --json`.
+`<config dir>/projects/<workspace folder>/<session>.jsonl`. The config dir is `$CLAUDE_CONFIG_DIR` when it is set, otherwise `~/.claude`. The workspace folder is the absolute path with `/` and `.` replaced by `-`. Tool calls are `tool_use` blocks in `assistant` messages. To pick your own session out of the files, read the first `user` record's `message.content`. Live sessions: `ListAgents` and `claude agents --json`. For `worktree-audit.sh`: `--store "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/{slug}"`.
 
 ### `locate`
 
@@ -73,6 +73,10 @@ Your tool list, or `claude mcp list`.
 ## For users
 
 - `/name` runs a skill.
+- The `skills` CLI id is `claude-code`. Claude Code lists skills through links in `~/.claude/skills/`.
+- It loads only `/setup-pstack` from the user's words. The other pstack skills load when the user types them, or when `/poteto-mode` runs them.
+- Skills documentation: https://code.claude.com/docs/en/skills
+- `/loop` repeats a prompt, the `skill-creator` skill writes skills, and plan mode plans before edits.
 
 ## Limits
 
