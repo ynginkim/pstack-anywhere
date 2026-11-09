@@ -15,7 +15,7 @@ This file names no product. The mechanisms live in [`adapters/`](adapters/), one
 Answer these as separate questions. They are not alternatives. A session runs in exactly one harness and in any number of environments.
 
 1. **Which environments are here?** Run `sh <folder of this file>/scripts/detect.sh` now, before you plan or start anything, and also when the task says to plan only. It prints the id of each environment adapter whose check answers yes. Read `adapters/<id>/adapter.md` for each id it prints. Do not decide this from the harness you are, from `which`, or from memory, and do not put the check off to a later step. No output means no environment: read [`references/plain.md`](references/plain.md).
-2. **Which harness are you?** Your own tool list and instructions tell you. Read the harness adapter in `adapters/` whose Detect section matches you. When none matches, pstack has no adapter for your harness. Use the fallbacks in the index and say so once.
+2. **Which harness are you?** Your own tool list and instructions tell you. Read the harness adapter in `adapters/` whose Detect section matches you now, in the same step as the environment adapters, also when the task plans no spawn. Most capabilities have the `own harness` scope, so that adapter answers them, `track-todos` and `ask-user` included. When none matches, pstack has no adapter for your harness. Use the fallbacks in the index and say so once.
 3. **This computer and this user.** `~/.agents/skills/select-model/SKILL.md` records which products and models are installed, which environments exist, and what the user prefers. Read it too. When it is missing, say so once and use the defaults in `../poteto-mode/SKILL.md`.
 
 ## 2. How to use the index

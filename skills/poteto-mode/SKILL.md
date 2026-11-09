@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 Bundled skills live at `../<name>/SKILL.md` from this file. Run one by reading that file and following it. Your harness's skill tool may refuse them, because they are slash-only. Put this file's absolute path in every subagent prompt (see Subagents).
 
-A step names what it needs from the environment by a capability name in backticks, such as `spawn-worker` or `ask-user`. Make `sh ../resolve-capability/scripts/detect.sh` the first call of every task, before anything else, also when the task only enters a playbook or only plans. Then read `../resolve-capability/SKILL.md`, the environment adapter for each id it printed, and the harness adapter whose Detect matches you. They say how each capability is done in this environment and what to do when it cannot be done.
+A step names what it needs from the environment by a capability name in backticks, such as `spawn-worker` or `ask-user`. Make `sh ../resolve-capability/scripts/detect.sh` the first call of every task, before anything else, also when the task only enters a playbook or only plans. Then, in the same first step, read `../resolve-capability/SKILL.md`, the environment adapter for each id it printed, and your harness adapter (`../resolve-capability/adapters/<id>/adapter.md`, the one whose Detect matches you). Read the harness adapter also when the task will spawn nothing: most capabilities, `track-todos` and `ask-user` among them, are answered there. They say how each capability is done in this environment and what to do when it cannot be done.
 
 ## Non-negotiables
 
