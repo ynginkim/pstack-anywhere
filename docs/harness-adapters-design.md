@@ -172,7 +172,7 @@ The Phase column says which phase owns each source. The ownership check's report
 | `references/plain.md` | stays in the contract | 1 |
 | `poteto-mode/playbooks/orchestrate.md:102` | points at the reattach step through the resolution procedure, in the same phase as the step's move | 1 |
 | `.agents/skills/verify-pstack/features/spawn.md:7` | the new path of the Orca worker reference | 1 |
-| `poteto-mode/SKILL.md` lines 93 and 100, "run `env \| grep '^ORCA_CLI_'`" | "run `../resolve-capability/scripts/detect.sh` before any plan", kept as a literal command | 2 |
+| `poteto-mode/SKILL.md` line 11, "read `../resolve-capability/SKILL.md`", and lines 93 and 100, "run `env \| grep '^ORCA_CLI_'`" | Line 11 makes `sh ../resolve-capability/scripts/detect.sh` the first call of every task, kept as a literal command, also when the task only enters a playbook or only plans. Lines 93 and 100 point at that step and drop "before you plan any spawn", a condition a task with no spawn never meets | 2 |
 | `poteto-mode/SKILL.md` lines 26, 95, 103, 113, and 139 | `author-skill`, decision 1, "a harness or an environment rejects the model", a model id taken from `select-model`, and `track-todos` | 2 |
 | `setup-pstack/SKILL.md` lines 8, 24, and 26 | the Orca adapter's Launching harnesses. `setup-pstack` names no product | 2 |
 | `ketchup`, `create-verification-skill`, `create-formal-verification-skill`, `maintain-verification-skill` | `run-skill` and `locate`, with `/name` as pstack's notation | 2 |
@@ -214,12 +214,12 @@ Each phase lands on its own and leaves pstack working. The Runs column counts ag
 | Phase | Change | Proof | Runs |
 | --- | --- | --- | --- |
 | 1. Split | Carry the facts from `select-model` (see Facts learned on this computer). Write the contract: the vocabulary with scopes, the resolution procedure, the fallbacks, the exact-step pointers, and `detect.sh`. Create the four adapters line by line, with the stub. Move `orchestrate.md:102` and `spawn.md:7`. Add `check-ownership.mjs` and the lint changes, scoped as Checks says. | The repo checks and `check-ownership`. One entry check each in Claude Code, Codex, and Grok. One spawn check from Claude Code to Codex without Orca. One spawn check of a Codex worker through the Orca adapter. | 5 |
-| 2. Core | The phase 2 rows, including the literal `detect.sh` command in `poteto-mode`, decision 1, decision 2, `orch.ts`, and `poteto-help`. Widen the checks to all of `skills/` except the generator. | The repo checks. `worktree-audit.sh` run on this repository with stores and without, where the run without stores buckets no worktree `safe`. The five `sonnet low` runs with `select-model` missing that `features/runtime.md` used when the Orca check was skipped. They prove that `detect.sh` runs before any plan and that decision 1 holds. | 5 |
+| 2. Core | The phase 2 rows, including the literal `detect.sh` command in `poteto-mode`, decision 1, decision 2, `orch.ts`, and `poteto-help`. Widen the checks to all of `skills/` except the generator. | The repo checks. `worktree-audit.sh` run on this repository with stores and without, where the run without stores buckets no worktree `safe`. The five `sonnet low` runs with `select-model` missing that `features/runtime.md` used when the Orca check was skipped, and the phase 1 Claude Code entry prompt again at `sonnet low`. Each of the five plans a spawn, and the entry prompt plans none. Together they prove that `detect.sh` is the first call whether or not a spawn is planned, and that decision 1 holds. | 6 |
 | 3. Generator | The phase 3 rows. Regenerate the user's `select-model` with the user, then delete the stub. Widen the checks to everything. | One generator run in a fake home. | 1 |
 | 4. Verify without Orca | A `verify-pstack` driver for headless runs (decision 3). It clears every `ORCA_*` variable and the `PATH` entry that holds `orca`, as the plain script in `vp.mjs` does, and asserts `ORCA vars left 0`. Orca stays as one driver. | One headless run per harness. Each verdict names its surface and what headless runs do not cover: an interactive `ask-user`, and a background wake after the process exits. | 3 |
 | 5. Docs | The phase 5 row. | The repo checks. | 0 |
 
-The plan costs 14 agent sessions. Only phase 4 is tied to removing Orca. Phases 1 to 3 are worth doing without it.
+The plan costs 15 agent sessions. Only phase 4 is tied to removing Orca. Phases 1 to 3 are worth doing without it.
 
 ## Removing Orca after this
 
@@ -232,7 +232,7 @@ Orca's own global skills (`orca-cli`, `orca-linear`, `orchestration`) and its ho
 
 ## Risks
 
-- **An agent can skip `detect.sh`.** The same skip happened with the Orca check: `sonnet low` skipped it in 4 of 5 runs while it lived only in the adapter (`features/runtime.md:35-38`). `poteto-mode` therefore keeps the command as a literal first step, and phase 2 reruns the five runs that caught the skip.
+- **An agent can skip `detect.sh`.** The same skip happened with the Orca check: `sonnet low` skipped it in 4 of 5 runs while it lived only in the adapter (`features/runtime.md:35-38`). `poteto-mode` therefore keeps the command as a literal first step, and phase 2 reruns the five runs that caught the skip. Phase 1 found a second way to skip it. In the Claude Code entry check (P1r-entry-claude-114929, `sonnet low`), the session read the contract, which says to run `detect.sh` now. It still left the check for later, because no spawn was planned yet. It followed `poteto-mode:93`, which ties the check to planning a spawn. So the phase 2 wording ties the check to the first call of the task, not to a plan, and phase 2 reruns that entry prompt too. A literal first step makes a skip less likely. It does not rule one out.
 - **A fact about two products.** The Orca adapter names the harnesses it launches. Launching harnesses keeps that to an id map and quirks, and the ownership check allows it in that section only.
 - **More reading for some capabilities.** `find-sessions` reads a heading from every harness adapter, and `spawn-worker` reads the target's. Each heading is short, and a session no longer reads lines about environments that are not here.
 - **Moving text can lose its verified state.** Each `(unverified)` mark and each "seen in run X" moves with its line. The ownership report lists every moved line, so the diff can be reviewed line by line for this.

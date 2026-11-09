@@ -4,10 +4,11 @@ Copy these as written. Each one is hard to undo. Do not rebuild them from memory
 
 ## Opening a pull request and building a stack
 
+If an environment adapter that `detect.sh` printed has an exact step with this heading, read it before you run anything below. It says whether it replaces the form below or adds to it, and you never run the form below on anything that environment manages.
+
 - Open it ready for review: `gh pr create` without `--draft`. If it was opened as a draft, run `gh pr ready <pr>`.
 - Read its state with `gh pr view <pr> --json state,isDraft,baseRefName`. A pull request is open and ready when `state` is `OPEN` and `isDraft` is `false`.
 - A child in a stack is created against its parent's branch: `gh pr create --base <parent branch>`. Point an existing one somewhere else with `gh pr edit <pr> --base <branch>`.
-- Under Orca, link the pull request to the workspace afterwards: `orca reference add <pr-url> --worktree active`.
 - Use `gh` and nothing else. The ban on `gt` stands.
 
 ## Merging a pull request
@@ -30,19 +31,14 @@ Pin the lease to the SHA you last pushed: `git push --force-with-lease=<branch>:
 
 ## Removing a worktree
 
-- Under Orca: `orca worktree rm --worktree <selector>`. Never `git worktree remove` or `rm -rf` on a worktree Orca manages, because Orca must forget it.
-- Without Orca: `git worktree remove --force <path>`. If anything is left, `rm -rf <path>` and then `git worktree prune`.
+If an environment adapter that `detect.sh` printed has an exact step with this heading, read it before you run anything below. It says whether it replaces the form below or adds to it, and you never run the form below on anything that environment manages.
+
+- `git worktree remove --force <path>`. If anything is left, `rm -rf <path>` and then `git worktree prune`.
 - Deleting is irreversible. Which worktrees to delete is the user's decision.
 
 ## Simulators
 
 `xcrun simctl --set testing delete all`, `xcrun simctl --set testing delete unavailable`, and `xcrun simctl runtime delete <id>`. Irreversible, so the user decides what goes.
-
-## Orca workers
-
-- `worker-release` only after an accepted settlement.
-- `worker-stop` and `worker-abandon` only on positive proof the agent stopped, and with the exact receipt from `orca skills get orchestration --reference references/recovery-and-cleanup.md`.
-- `orca orchestration reset` is destructive. Never call it on your own.
 
 ## What goes to the user
 
