@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 A pstack step names what it needs by a capability name in backticks, such as `spawn-worker`. It does not name a tool. This skill says how to find the tool that does it here. The skills that name capabilities live next to this one, so read this file as `../resolve-capability/SKILL.md`.
 
-This file names no product. The mechanisms live in [`adapters/`](adapters/), one folder per product, each with an `adapter.md`. A harness adapter covers the agent a session runs in. An environment adapter covers a layer that runs on top of harnesses and adds to them. This file holds the vocabulary, the rules for choosing among the adapters' mechanisms, and what to do when no adapter has one.
+This file names no product. The mechanisms live in [`adapters/`](adapters/), one folder per product, each with an `adapter.md`. A harness adapter covers the agent a session runs in. An environment adapter covers a layer that runs on top of harnesses and adds to them. This file holds the vocabulary, the rules for choosing among the adapters' mechanisms, and what to do when no adapter has one. A new adapter starts from [`references/adapter-template.md`](references/adapter-template.md).
 
 ## 1. Which environment is this
 
