@@ -47,6 +47,8 @@ Present the synthesizer's full Accepted / Rejected / Backlog output and wait for
 
 File each Backlog item to your team's devex or backlog tracker without waiting. Only the Accepted list waits for approval.
 
+Never edit a skill where an installer keeps it, such as a plugin cache or a skills folder the next install overwrites. Before approval, show where each edit will land: the skill's source checkout when you can find one, otherwise a copy of the skill folder in a project or user skill folder that `locate` lists. After approval, edit there. Never open a PR or push.
+
 Follow each approved row's Routing exactly:
 
 - Trivial existing-skill edit (a one-line bullet, a tightened sentence, a stale fact corrected): the parent does it directly.

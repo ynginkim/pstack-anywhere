@@ -21,9 +21,9 @@ Every candidate gets the same prompt, so the prompt is the contract.
    | Seat | Kind | Needs | Count and diversity |
    |---|---|---|---|
    | Runner | code, or prose and judgment, by the task | writes only its own output location | one per distinct approach, at least two on different models, from different vendors when the computer has them. More runners when the arena covers multiple design directions. The same model N times only when the work is generation-bound rather than judgment-sensitive. All start together. A request to keep the run small narrows the scope, not the number of vendors. Only the user asking for fewer vendors does. |
-   | Cross-judge | judgment | read-only | one, on an agent other than your own when one is reachable. It starts after every candidate has finished. |
+   | Cross-judge | judgment | read-only | one, never from your own model's vendor. Try the other vendors' models in the order `select-model` prefers them. When none of them starts, Phase C skips the judge and says so. It starts after every candidate has finished. |
 
-   Pick each runner's reasoning level and speed for the job, per that section.
+   Pick each runner's reasoning level and speed for the job, per that section. When a runner's model does not start, use the nearest model of the same vendor, or drop the seat and say so. When dropped seats leave fewer than two runners, add runners until there are two, on a remaining runner's model or, when none remains, on your own model, and say so.
 4. Give each candidate its own output location (`isolate-checkout` where possible, otherwise `/tmp/arena-<slug>/candidate-<n>/`), per the **separate-before-serializing-shared-state** principle skill.
 
 ## Phase B: Fan out
@@ -38,7 +38,7 @@ After all Phase B candidates complete, start the Cross-judge seat from step 3, r
 
 ## Phase D: Pick a base
 
-Read every candidate end to end before picking. Score each against the rubric criterion by criterion, not on holistic feel, and compare with the cross-judge. Agreement on the base confirms the pick. Disagreement means one of you is biased or the rubric was ambiguous. Read both rationales before deciding.
+Read every candidate end to end before picking. Score each against the rubric criterion by criterion, not on holistic feel, and compare with the cross-judge when Phase C ran one. Agreement on the base confirms the pick. Disagreement means one of you is biased or the rubric was ambiguous. Read both rationales before deciding.
 
 Pick the base a future maintainer can extend most easily without breaking invariants. When two feel tied, prefer the cleaner boundary or smaller API, per the Laziness Protocol.
 
@@ -54,4 +54,4 @@ Verify the synthesized artifact like any other output, per the **prove-it-works*
 
 ## Outputs
 
-One synthesized artifact, with a short synthesis note alongside naming the base and why, the cross-judge's verdict, each graft with its source candidate, what was rejected and why, any convergence or dropouts, and the verification result.
+One synthesized artifact, with a short synthesis note alongside naming the base and why, the cross-judge's verdict or that Phase C skipped the judge, each graft with its source candidate, what was rejected and why, any convergence or dropouts, and the verification result.
