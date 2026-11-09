@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 > Names in backticks, such as `spawn-worker` and `find-sessions`, are capabilities, not commands. Read `../resolve-capability/SKILL.md` before the first step. It says how each one is done here and whether a worker on another agent can be started.
 
-Open a plan with `track-todos`, one entry per phase (Frame, Fan out, Cross-judge, Pick, Graft, Verify), before launching anything.
+Open a plan with `track-todos`, one entry per phase (Frame, Fan out, Cross-judge, Pick, Graft, Verify, Clean up), before launching anything.
 
 ## Phase A: Frame
 
@@ -52,6 +52,10 @@ If the candidates converge on one shape, that is strong agreement. Note it and s
 
 Verify the synthesized artifact like any other output, per the **prove-it-works** principle skill. If verification finds a problem the arena missed, either Phase A was wrong (re-frame and re-run) or a candidate caught it and you missed the graft (go back to Phase E). Don't paper over it.
 
+## Phase G: Clean up
+
+After Phase F, remove each candidate checkout this run made, with the exact step "Removing a worktree" in `../resolve-capability/references/exact-steps.md`, as written. A candidate folder under `/tmp` that is not a worktree goes with `rm -rf <path>`. Keep the checkout that holds the synthesized artifact until the artifact is committed or copied out of it. Remove nothing this run did not make.
+
 ## Outputs
 
-One synthesized artifact, with a short synthesis note alongside naming the base and why, the cross-judge's verdict or that Phase C skipped the judge, each graft with its source candidate, what was rejected and why, any convergence or dropouts, and the verification result.
+One synthesized artifact, with a short synthesis note alongside naming the base and why, the cross-judge's verdict or that Phase C skipped the judge, each graft with its source candidate, what was rejected and why, any convergence or dropouts, the verification result, and which candidate checkouts were removed or kept.

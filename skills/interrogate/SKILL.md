@@ -31,8 +31,13 @@ Verify each finding per arena Phase F by rerunning its command. Keep a finding w
 
 Skip arena Phases C, D, and E. Adversaries find different failures, so the verdict keeps every verified finding, not one adversary's list.
 
+## Clean up
+
+After Verify, remove each adversary's checkout that this run made, with the exact step "Removing a worktree" in `../resolve-capability/references/exact-steps.md`, as written. First copy each repro file that a verified finding's command needs into a `mktemp -d` folder, and point the finding's command at the copy. Remove nothing this run did not make.
+
 ## Output
 
 - **Intent**: the restatement.
 - **Findings**: for each verified finding, the command, its output, how it breaks the intent, and the adversaries that found it, each named by agent, model, and effort. Say "no verified findings" when none survive.
 - **Dropped**: for each adversary, the count of dropped findings and why.
+- **Cleanup**: the adversary checkouts removed, and any kept with the reason.
