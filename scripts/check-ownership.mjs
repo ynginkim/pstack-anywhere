@@ -7,7 +7,7 @@
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { ADAPTERS, CONTRACT, PRODUCT_FREE, PRODUCT_PATTERNS, TEXT_FILE, TRANSITIONAL, trackedFiles } from './product-patterns.mjs'
+import { ADAPTERS, CONTRACT, PRODUCT_FREE, PRODUCT_PATTERNS, TEXT_FILE, TRANSITIONAL, inProductScope, trackedFiles } from './product-patterns.mjs'
 
 const root = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim()
 const args = process.argv.slice(2)
@@ -59,7 +59,7 @@ function check() {
   const owners = new Map()
   for (const a of adapters) for (const t of a.owns) owners.set(t.key, [...(owners.get(t.key) ?? []), a])
 
-  const inScope = (f) => PRODUCT_FREE.some((x) => f.startsWith(x))
+  const inScope = inProductScope
   let scanned = 0
   for (const [f, text] of lines) {
     if (!inScope(f) || TRANSITIONAL.has(f)) continue
@@ -117,7 +117,7 @@ function parseAdapters(problems) {
     const owns = (/^owns:\s*\[(.*)\]/m.exec(head)?.[1] ?? '').split(',').map((s) => s.trim()).filter(Boolean)
     if (kind !== 'harness' && kind !== 'environment') problems.push(`${file}  kind is harness or environment`)
     if (!owns.length) problems.push(`${file}  owns lists no token`)
-    const tokens = new Map(owns.map((t) => [t.toLowerCase(), /^[A-Za-z]+$/.test(t) ? new RegExp(`\\b${t}\\b`, 'i') : new RegExp(t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))]))
+    const tokens = new Map(owns.map((t) => [t.toLowerCase(), /^[A-Za-z]+$/.test(t) ? new RegExp(`(?<!pstack-)\\b${t}\\b`, 'i') : new RegExp(t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))]))
     out.push({ id, kind, file, dir: `${ADAPTERS}${id}/`, tokens, owns: [...tokens.keys()].map((key) => ({ key })) })
   }
   return out

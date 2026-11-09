@@ -36,7 +36,7 @@ The `agents/` files are not installed by the `skills` CLI. `poteto-mode` and `no
 
 New here? The [pstack guide](./docs/guide/README.md) walks through a first real task, from setup and prompting through verification and overnight runs. Stuck, or unsure which skill fits? Ask [`/poteto-help`](./skills/poteto-help/SKILL.md).
 
-Out of the box, with no `select-model`, `poteto-mode` sends code and reading to Grok and prose, judgment, and the hardest changes to Claude Opus, and says so in its reply.
+Out of the box, with no `select-model`, `poteto-mode` keeps every seat on the harness it runs in. It gives prose, judgment, and the hardest changes that harness's strongest model, gives routine code and reading a faster one, and suggests `/setup-pstack` once in its reply.
 
 ## Where it runs
 

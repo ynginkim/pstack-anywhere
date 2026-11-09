@@ -47,7 +47,7 @@ Adds to. After `gh pr create`, `orca reference add <pr-url> --worktree active` l
 
 ### `find-sessions`
 
-Adds to. `orca search`, `orca worktree ps`, and `orca orchestration worker-read`. A harness that Orca started under one of its accounts keeps its sessions in that account's home, not in its own store. Launching harnesses names that home per agent. Read it in place of the harness's own store.
+Adds to. `orca search`, `orca worktree ps`, and `orca orchestration worker-read`. A harness that Orca started under one of its accounts keeps its sessions in that account's home, not in its own store. Launching harnesses names that home per agent. Read it in place of the harness's own store, and pass it to `worktree-audit.sh` as an extra `--store` in the harness's form, with that home in place of the harness's default.
 
 ### `locate`
 
@@ -99,6 +99,11 @@ Replaces the contract's form for a worktree Orca manages: `orca worktree rm --wo
 - `worker-release` only after an accepted settlement.
 - `worker-stop` and `worker-abandon` only on positive proof the agent stopped, and with the exact receipt from `orca skills get orchestration --reference references/recovery-and-cleanup.md`.
 - `orca orchestration reset` is destructive. Never call it on your own.
+
+## For users
+
+- Orca adds supervised workers, durable runs, schedules, and remote environments to the harnesses it runs.
+- An Orca automation runs a prompt on a schedule, which is how `run-on-schedule` is done here.
 
 ## Limits
 

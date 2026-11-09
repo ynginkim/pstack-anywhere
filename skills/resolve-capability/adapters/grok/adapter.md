@@ -21,7 +21,7 @@ Your instructions say you are Grok.
 
 ### `find-sessions`
 
-`~/.grok/sessions/<URL-encoded cwd>/<session>/chat_history.jsonl`. `summary.json` in the same folder has `current_model_id` and `reasoning_effort`. Read the model and the effort that ran from there and say them in your reply.
+`~/.grok/sessions/<URL-encoded cwd>/<session>/chat_history.jsonl`. `summary.json` in the same folder has `current_model_id` and `reasoning_effort`. Read the model and the effort that ran from there and say them in your reply. For `worktree-audit.sh`: `--store "$HOME/.grok/sessions"`.
 
 ### `locate`
 
@@ -40,6 +40,8 @@ Your tool list, or `grok mcp list`.
 ## For users
 
 - `/name` runs a skill (seen when Grok took `/poteto-mode` as a slash command).
+- The `skills` CLI id is `grok`. Grok lists skills through links in `~/.grok/skills/`.
+- It may load any skill from its description.
 
 ## Limits
 
