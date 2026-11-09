@@ -899,10 +899,10 @@ function plainScript(r, prompt) {
     r.agent === 'claude'
       ? `exec claude --dangerously-skip-permissions${flags} "$(cat '${promptFile}')"`
       : `exec codex${flags} --dangerously-bypass-approvals-and-sandbox "$(cat '${promptFile}')"`
-  const script = `#!/bin/bash
-# Starts ${r.agent} the way a terminal Orca did not open would: no ORCA_* variables and no orca binary on PATH.
-unset $(env | grep -o '^ORCA_[A-Za-z_]*')
-NEW=""
+  // --keep-orca-cli leaves the orca binary on PATH: a terminal outside Orca on a computer that has Orca installed.
+  const stripPath = r.keep_orca_cli
+    ? ''
+    : `NEW=""
 IFS=: read -ra DIRS <<< "$PATH"
 for d in "\${DIRS[@]}"; do
   case "$d" in *Orca.app*) continue ;; esac
@@ -914,7 +914,11 @@ for d in "\${DIRS[@]}"; do
   NEW="\${NEW:+$NEW:}$d"
 done
 export PATH="$NEW"
-cd '${TESTBED}'
+`
+  const script = `#!/bin/bash
+# Starts ${r.agent} the way a terminal Orca did not open would: no ORCA_* variables${r.keep_orca_cli ? '' : ' and no orca binary on PATH'}.
+unset $(env | grep -o '^ORCA_[A-Za-z_]*')
+${stripPath}cd '${TESTBED}'
 echo "vp plain: ORCA vars left $(env | grep -c '^ORCA_'), orca on PATH: $(command -v orca || echo none)"
 ${exec}
 `
@@ -924,7 +928,7 @@ ${exec}
 }
 
 function launch(args) {
-  const { pos, opt } = parseArgs(args, ['ignore-lock'])
+  const { pos, opt } = parseArgs(args, ['ignore-lock', 'keep-orca-cli'])
   const label = pos[0]
   if (!label || !/^[A-Za-z0-9-]+$/.test(label)) die('vp launch <label> --agent claude|codex|grok [--surface terminal|chat|plain] --prompt "<text>"')
   const agent = opt.agent
@@ -935,6 +939,7 @@ function launch(args) {
   if (opt.effort && opt.effort !== 'default' && opt.model === 'default') die('Orca takes --effort only with --model')
   if (agent === 'grok' && (opt.model || opt.effort)) die('Orca refuses --model and --effort for grok. Launch without them and read the model from the record')
   if (surface === 'plain' && agent === 'grok') die('no plain recipe for grok yet')
+  if (opt['keep-orca-cli'] && surface !== 'plain') die('--keep-orca-cli is for --surface plain')
   if (!opt.prompt) die('--prompt is required')
   const me = owner()
   const lock = readLock()
@@ -962,6 +967,7 @@ function launch(args) {
     effort: opt.effort === 'default' ? null : (opt.effort ?? DEFAULTS[agent].effort ?? null),
     prompt,
     fakehome: opt.fakehome ?? null,
+    keep_orca_cli: Boolean(opt['keep-orca-cli']),
     testbed: TESTBED,
     started_at: iso(stamp.getTime()),
     before: { select_model: smState(), lock: readLock(), testbed: testbedStatus() },
@@ -1360,7 +1366,7 @@ const HELP = `vp.mjs: drive pstack skills in real agent sessions (see ../SKILL.m
                                   the shared ~/.agents/skills/select-model and its lock
   fakehome <name> [--sample] [--from <dir>]   a throwaway home under /tmp for generator runs
   launch <label> --agent claude|codex|grok [--surface terminal|chat|plain] --prompt "<text>"
-         [--model <id>|default] [--effort <level>|default] [--fakehome <dir>] [--ignore-lock]
+         [--model <id>|default] [--effort <level>|default] [--fakehome <dir>] [--ignore-lock] [--keep-orca-cli]
   wait <run> [--timeout 240] [--quiet 20]    exit 0 finished, 2 still running, 3 asking a question, 4 at a permission prompt
   read <run> [--width 160] | read --record <file> [--agent claude|codex|grok]
   screen <run> | key <run> down|up|enter|"<text>"   terminal and plain runs only
