@@ -19,13 +19,10 @@ export const ADAPTERS = 'skills/resolve-capability/adapters/'
 // The stub keeps old links to the Orca worker reference alive until phase 3 regenerates select-model.
 export const TRANSITIONAL = new Set(['skills/resolve-capability/references/orca-workers.md'])
 
-// Phase 3 of docs/harness-adapters-design.md moves the generator's product facts into the adapters' Survey sections.
-export const GENERATOR = 'skills/create-model-selection-skill/'
-
-// All of skills/ outside the adapters and the generator. The repository's own name, pstack-orca, is not a product name.
+// All of skills/ outside the adapters. The repository's own name, pstack-orca, is not a product name.
 export const PRODUCT_FREE = ['skills/']
 
-export const inProductScope = (file) => PRODUCT_FREE.some((x) => file.startsWith(x)) && !file.startsWith(GENERATOR)
+export const inProductScope = (file) => PRODUCT_FREE.some((x) => file.startsWith(x))
 
 export const isProductFree = (file) => inProductScope(file) && !file.startsWith(ADAPTERS) && !TRANSITIONAL.has(file)
 
