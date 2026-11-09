@@ -92,7 +92,7 @@ The user installed pstack globally (`npx skills add <repo> -g -a claude-code -a 
 
 ## Launch
 
-`$VP launch <label> --agent claude|codex|grok [--surface terminal|chat|plain] --prompt "<prompt>"` starts one session, in a terminal unless `--surface` says otherwise. The run id is `<label>-<HHMMSS>`. It goes into the prompt as `[<run id>]`, at the end or wherever the prompt says `{marker}`. A prompt that needs the bare id, such as in a temp path, writes `{id}`. `{testbed}` becomes the testbed's absolute path, and `{home}` the fake home given with `--fakehome`. The launch output, the prompt, and the state before the run go to `run.json` in the run's evidence folder.
+`$VP launch <label> --agent claude|codex|grok [--surface terminal|chat|plain] --prompt "<prompt>"` starts one session, in a terminal unless `--surface` says otherwise. The run id is `<label>-<HHMMSS>`, with `-2`, `-3`, and so on when another run of that label started in the same second. It goes into the prompt as `[<run id>]`, at the end or wherever the prompt says `{marker}`. A prompt that needs the bare id, such as in a temp path, writes `{id}`. `{testbed}` becomes the testbed's absolute path, and `{home}` the fake home given with `--fakehome`. The launch output, the prompt, and the state before the run go to `run.json` in the run's evidence folder.
 
 What `vp` runs for each surface, so you can run it by hand. `<testbed>` is `$VP_TESTBED`, by default `~/Documents/pstack-testbed`, and `<evidence>` is `$VP_EVIDENCE`, by default `~/.cache/verify-pstack/evidence`.
 
