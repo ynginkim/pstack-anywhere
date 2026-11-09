@@ -43,6 +43,15 @@ Your tool list, or `grok mcp list`.
 - The `skills` CLI id is `grok`. Grok lists skills through links in `~/.grok/skills/`.
 - It may load any skill from its description.
 
+## Survey
+
+- **Installed.** `grok` on `PATH`.
+- **Models and efforts.** `~/.grok/models_cache.json` has a `models` object keyed by model id. Each entry's `info.reasoning_efforts` lists its efforts.
+- **Your own subagents.** When you are running in Grok, the subagent tool is `spawn_subagent`. Read its schema for the models it accepts. This was not run for this fork. Say `not verified here`.
+- **Skill folder.** `~/.grok/skills/`. The `skills` CLI links a skill there as `<name> -> ../../.agents/skills/<name>`.
+- **Model pin.** `[models] default` in `~/.grok/config.toml`, and `default_reasoning_effort` in the same table (seen on 2026-11-09). A start through Start me from outside takes `-m` and `--reasoning-effort` instead. The model and effort that ran are in the session record, as `find-sessions` says.
+- **Suited to.** Code and reading. With no preference from the user, the generator offers `grok-4.7-build-fast` at `xhigh` for that work, when the survey found it.
+
 ## Limits
 
 - Grok running on its own, outside an environment, has not been run for this fork as the session you run in.

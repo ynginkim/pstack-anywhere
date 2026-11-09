@@ -78,6 +78,16 @@ Your tool list, or `claude mcp list`.
 - Skills documentation: https://code.claude.com/docs/en/skills
 - `/loop` repeats a prompt, the `skill-creator` skill writes skills, and plan mode plans before edits.
 
+## Survey
+
+- **Installed.** `claude` on `PATH`.
+- **Models and efforts.** The `Agent` tool's schema has `model` and `effort`. Read the accepted `model` values and the effort values from the schema you have now. Do not write them from memory: they change with the Claude Code version.
+- **Subagent types.** Read the subagent types and the tools each one has from the same schema, as `spawn-subagent` says. Record which types keep your MCP servers by reading their tool lists, not by assuming.
+- **`poteto-agent`.** A subagent started from a repository that has `agents/poteto-agent.md` installed can use the `poteto-agent` type.
+- **Skill folder.** `~/.claude/skills/`. The `skills` CLI links a skill there as `<name> -> ../../.agents/skills/<name>`.
+- **Model pin.** `settings.json` in the config dir (`$CLAUDE_CONFIG_DIR`, otherwise `~/.claude`), and the project's `.claude/settings.json`. Seen on 2026-11-09: `model` names the model, and `modelSettings` sets an `effortLevel` per model id.
+- **Suited to.** Prose, judgment, and the hardest changes. With no preference from the user, the generator offers `opus` at `xhigh` for that work, when the survey found it.
+
 ## Limits
 
 - No command or file read here reports remaining usage. `/usage` exists only in an interactive session. A limit shows up as an error when a start fails.
