@@ -5,7 +5,7 @@ A user runs `/setup-pstack`. It says whether this is a new setup or an update, t
 ## Sub-features
 
 - `gen-state` says in one sentence whether this is a new setup or an update.
-- `gen-survey` runs `detect.sh` and reads the `## Survey` section of each adapter it uses, finds `claude`, `codex`, and `grok`, reads Orca's model catalog, notes model pins in each product's settings, and records under Environment in `inventory.md` whether `gh` is logged in, whether `bun` is installed, the saved Orca environments, and which headless CLIs are on `PATH` (without running them).
+- `gen-survey` reads the `## Survey` section of each adapter, surveys every installed environment even from a session outside it, runs `detect.sh` to record which one it ran in, finds `claude`, `codex`, and `grok`, reads Orca's model catalog, notes model pins in each product's settings, and records under Environment in `inventory.md` whether `gh` is logged in, whether `bun` is installed, the saved Orca environments, and which headless CLIs are on `PATH` (without running them).
 - `gen-noask` asks no question when the prompt already answers them all.
 - `gen-write` writes `SKILL.md` (under about 90 lines), `inventory.md`, and `log.md` under the target, and no `references/`. `SKILL.md` points at `../resolve-capability/SKILL.md`, with a fallback to the folder that holds `poteto-mode`. `inventory.md` gives each product every way to start it, such as an Orca worker or `grok -p` and `codex exec`, with the adapter section that holds the command, and ends with `## Quirks seen here`. `## Preferences` holds no start command, flag, or path.
 - `gen-prefs` writes one sentence per answer with its reason under `## Preferences`, and nothing the user did not say.

@@ -107,8 +107,9 @@ Replaces the contract's form for a worktree Orca manages: `orca worktree rm --wo
 
 ## Survey
 
-- **Data folder.** `ORCA_USER_DATA_PATH` points at Orca's data folder.
-- **What can run.** Every agent in `$ORCA_USER_DATA_PATH/agent-model-catalog.json` can run as an Orca worker. The file lists what Orca probed, with the efforts of each model. List it with the `jq` command in Launching harnesses, and survey each agent through the adapter the id map there names. An agent can have several entries, one per account, so `sort -u` drops the repeats. Treat an id as available when any entry lists it. An agent whose CLI is not installed cannot start.
+- **Installed.** `orca` on `PATH`. A session outside Orca can still survey it: on 2026-11-09, `orca environment list` answered from a session with no `ORCA_` variable set, and the catalog below was readable.
+- **Data folder.** `ORCA_USER_DATA_PATH` points at Orca's data folder. Outside Orca the variable is unset. On macOS the folder is `~/Library/Application Support/orca` (seen on 2026-11-09), so use that path in its place.
+- **What can run.** Every agent in `$ORCA_USER_DATA_PATH/agent-model-catalog.json` can run as an Orca worker. The file lists what Orca probed, with the efforts of each model. List it with the `jq` command in Launching harnesses, and survey each agent through the adapter the id map there names. Under Orca a harness can keep its own home per Orca account, as Launching harnesses says, and that home's model cache can differ from the harness's own. An agent can have several entries, one per account, so `sort -u` drops the repeats. Treat an id as available when any entry lists it. An agent whose CLI is not installed cannot start.
 - **Environments.** Record the saved Orca environments (`orca environment list`) under Environment in `inventory.md`.
 - **Question.** Another vendor's agent as an Orca worker: allowed, allowed only for reading, or not allowed. Ask it after the generator's own questions, and write the answer as a sentence under `## Preferences`.
 
