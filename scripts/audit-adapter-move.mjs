@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// Checks that every hedge on a mechanism in resolve-capability at <old ref> still sits next to that
-// mechanism in the working tree, so a move cannot turn an unverified claim into a plain one.
-// Usage: node scripts/audit-adapter-move.mjs <old ref>
+// Checks that every hedge on a mechanism in <source dir> at <old ref> still sits next to that
+// mechanism in resolve-capability or <source dir> in the working tree, so a move cannot turn an unverified claim into a plain one.
+// Usage: node scripts/audit-adapter-move.mjs <old ref> [<source dir>, default skills/resolve-capability/]
 
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
@@ -10,8 +10,9 @@ import { CONTRACT, trackedFiles } from './product-patterns.mjs'
 
 const root = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim()
 const ref = process.argv[2]
+const source = process.argv[3] ?? CONTRACT
 if (!ref) {
-  console.error('usage: node scripts/audit-adapter-move.mjs <old ref>')
+  console.error('usage: node scripts/audit-adapter-move.mjs <old ref> [<source dir>]')
   process.exit(2)
 }
 
@@ -30,11 +31,11 @@ const hedgesOf = (s) => HEDGES.filter(([, re]) => re.test(s)).map(([name]) => na
 const ticks = (s) => [...s.matchAll(/`([^`]+)`/g)].map((m) => m[1])
 const words = (s) => new Set(s.toLowerCase().match(/[a-z][a-z-]{5,}/g) ?? [])
 
-const oldFiles = execFileSync('git', ['ls-tree', '-r', '--name-only', ref, '--', CONTRACT], { cwd: root, encoding: 'utf8' })
+const oldFiles = execFileSync('git', ['ls-tree', '-r', '--name-only', ref, '--', source], { cwd: root, encoding: 'utf8' })
   .split('\n')
   .filter((f) => f.endsWith('.md'))
 const old = oldFiles.flatMap((f) => sentences(f, execFileSync('git', ['show', `${ref}:${f}`], { cwd: root, encoding: 'utf8' })))
-const now = trackedFiles(root, [CONTRACT])
+const now = trackedFiles(root, [...new Set([CONTRACT, source])])
   .filter((f) => f.endsWith('.md'))
   .flatMap((f) => sentences(f, readFileSync(join(root, f), 'utf8')))
 
@@ -61,7 +62,7 @@ for (const s of old) {
   else missing.push(s)
 }
 
-console.log(`Hedged sentences in ${CONTRACT} at ${ref}: ${hedged}. Still hedged next to the same mechanism: ${found.length}. Missing: ${missing.length}.\n`)
+console.log(`Hedged sentences in ${source} at ${ref}: ${hedged}. Still hedged next to the same mechanism: ${found.length}. Missing: ${missing.length}.\n`)
 for (const [s, n] of found) console.log(`ok       ${s.file}:${s.line} -> ${n.file}:${n.line}  [${hedgesOf(s.text).join(', ')}] ${ticks(s.text).slice(0, 3).join(' ')}`)
 for (const s of missing) console.log(`MISSING  ${s.file}:${s.line}  [${hedgesOf(s.text).join(', ')}] ${s.text.slice(0, 120)}`)
 process.exit(missing.length ? 1 : 0)
