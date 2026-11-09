@@ -4,7 +4,7 @@ A session where `scripts/detect.sh` prints nothing has no supervised workers, no
 
 - `spawn-worker`: start another product's CLI headless from the shell, as that product's Start me from outside section and `cli-workers.md` say. That needs the product installed and logged in. `select-model` records which are. When none is, run the seat on your own model and say in one line which product would run it.
 - `control-agent` and `find-sessions`: the harness's own session tools, in its adapter.
-- `coordinate-workers`: the `orch` tool in `../poteto-mode/scripts/orch/`, or the plan in the reply.
+- `coordinate-workers`: one tracker file in `durable-store`, or the plan in the reply.
 - `run-remote` has no mechanism. `run-on-schedule` and `wake-on-event` use the harness's own, or the fallback in the index.
 - When no other vendor is reachable, "several models together" means several models of your own vendor. Say that diversity is lower than a mixed panel would give.
 - A read-only seat uses the harness's read-only subagent type, or the other product's read-only mode where its adapter names one, and a brief that says not to edit. Check `git status` after.
