@@ -4,18 +4,25 @@
 # operated in it. Emits a table sorted by size with a suggested bucket. Never
 # deletes anything; deletion stays a human-gated step in the playbook.
 #
-# Usage: worktree-audit.sh [-b|--base <ref>] [repo-path]
+# Usage: worktree-audit.sh [-b|--base <ref>] [--store <dir>]... [repo-path]
 #   repo-path defaults to the current repo.
 #   -b sets the ref the MERGED column checks against (e.g. origin/integration).
 #   Without it the base is origin/HEAD, then origin/main, then origin/master.
 #   origin/HEAD is the remote's default branch, not necessarily the branch PRs
 #   merge into; pass -b when they differ.
+#   --store names a transcript store to search for the last chat in each
+#   worktree. Repeat it once per store. A store with {slug} is searched for the
+#   main worktree and for each worktree, with {slug} replaced by that absolute
+#   path with / and . turned into -. A store that does not exist is skipped.
+#   Without any --store, LAST_CHAT is unknown and no worktree is bucketed safe.
 set -u
 
 base=""
+stores=()
 while [ $# -gt 0 ]; do
 	case "$1" in
 	-b|--base) [ $# -ge 2 ] || { echo "error: $1 needs a ref" >&2; exit 2; }; base="$2"; shift 2 ;;
+	--store) [ $# -ge 2 ] || { echo "error: $1 needs a directory" >&2; exit 2; }; stores+=("$2"); shift 2 ;;
 	-h|--help) sed -n '2,/^set -u/p' "$0" | sed '$d; s/^# \{0,1\}//'; exit 0 ;;
 	-*) echo "error: unknown option: $1" >&2; exit 2 ;;
 	*) break ;;
@@ -64,16 +71,18 @@ if raw=$(gh pr list --author "@me" --state all --limit 1000 \
 fi
 [ -s "$prs" ] || echo "[]" > "$prs"
 
-# Transcript stores that can show which chat touched a worktree. Each harness
-# keeps its own, and a store that does not exist is skipped. Claude Code keeps
-# one folder per working directory, named for the absolute path with / and .
-# turned into -. Codex and Grok keep one store each.
-claude_projects="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects"
 slug_of() { printf -- '-%s' "$(printf '%s' "$1" | sed 's#^/##; s#[/.]#-#g')"; }
-shared_roots=()
-for d in "$(printf '%s/%s' "$claude_projects" "$(slug_of "$main_wt")")" "${CODEX_HOME:-$HOME/.codex}/sessions" "$HOME/.grok/sessions"; do
-	[ -d "$d" ] && shared_roots+=("$d")
-done
+# The stores for one worktree: each --store as given, and each {slug} store for
+# the main worktree and for this one.
+roots_for() {
+	local s
+	for s in ${stores[@]+"${stores[@]}"}; do
+		case "$s" in
+		*'{slug}'*) printf '%s\n' "${s//\{slug\}/$(slug_of "$main_wt")}" "${s//\{slug\}/$(slug_of "$1")}" ;;
+		*) printf '%s\n' "$s" ;;
+		esac
+	done | sort -u | while IFS= read -r d; do [ -d "$d" ] && printf '%s\n' "$d"; done
+}
 now=$(date +%s)
 
 echo "# base: $base"
@@ -111,12 +120,11 @@ git worktree list --porcelain | awk '/^worktree /{print $2}' | while read -r wt;
 	[ -z "$pr" ] && pr="-"
 
 	# Most recent chat whose transcript operated in this worktree. Match path
-	# followed by "/" or a quote so glint-482 does not match glint-482-r37. A
-	# Claude Code chat started inside the worktree has its own folder.
+	# followed by "/" or a quote so glint-482 does not match glint-482-r37.
 	last="-"; last_ts=0
-	roots=(${shared_roots[@]+"${shared_roots[@]}"})
-	own="$claude_projects/$(slug_of "$wt")"
-	[ -d "$own" ] && roots+=("$own")
+	[ "${#stores[@]}" -eq 0 ] && last=unknown
+	roots=()
+	while IFS= read -r d; do roots+=("$d"); done < <(roots_for "$wt")
 	if [ "${#roots[@]}" -gt 0 ]; then
 		f=$(rg -l -e "${wt}/" -e "${wt}\"" "${roots[@]}" 2>/dev/null \
 			| xargs stat "${stat_fmt[@]}" 2>/dev/null | sort -rn | head -1)
@@ -128,6 +136,7 @@ git worktree list --porcelain | awk '/^worktree /{print $2}' | while read -r wt;
 	case "$dirty" in wip:*) bucket=hold-wip ;; *)
 		case "$pr" in */open|*/draft) bucket=hold-open-pr ;; *)
 			if [ "$recent" = yes ]; then bucket=verify-recent-chat
+			elif [ "$last" = unknown ]; then bucket=review
 			elif [ "$merged" = YES ] || [ "$pr" != "-" ]; then bucket=safe
 			else bucket=review; fi ;;
 		esac ;;
