@@ -15,7 +15,9 @@ git -C "$tmp/cursor" sparse-checkout set pstack cursor-team-kit
 sha=$(git -C "$tmp/cursor" rev-parse --short HEAD)
 
 git -C "$repo" worktree add -q "$tmp/wt" upstream
-rsync -a --delete --exclude .git --exclude /cursor-team-kit/ "$tmp/cursor/pstack/" "$tmp/wt/"
+# --checksum: the clone and the worktree are checked out in the same second in CI, so a same-size change
+# would look unchanged to rsync's size-and-mtime check.
+rsync -a --checksum --delete --exclude .git --exclude /cursor-team-kit/ "$tmp/cursor/pstack/" "$tmp/wt/"
 rm -rf "$tmp/wt/cursor-team-kit"
 for path in "${team_kit[@]}"; do
   # A path Cursor deleted is left out, so the report lists it as removed.
