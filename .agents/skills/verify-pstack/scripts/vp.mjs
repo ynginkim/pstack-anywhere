@@ -906,11 +906,12 @@ const ORCA_FREE = {
   },
 }
 
-// Variables a calling agent session exports, which a user's own shell does not have.
-const PARENT_SESSION_VARS = '^(CLAUDECODE|CLAUDE_CODE_|CLAUDE_AGENT_SDK_|CODEX_SANDBOX|CODEX_THREAD_ID)'
-// The user's own settings, which a shell may export under the same prefixes. These stay.
-const USER_SETTING_VARS = '^(CLAUDE_CONFIG_DIR|CODEX_HOME|CLAUDE_CODE_OAUTH_TOKEN|CLAUDE_CODE_USE_(BEDROCK|VERTEX|FOUNDRY)|CLAUDE_CODE_SKIP_(BEDROCK|VERTEX|FOUNDRY)_AUTH)$'
-const PARENT_SESSION_LIST = `compgen -e | grep -E '${PARENT_SESSION_VARS}' | grep -vE '${USER_SETTING_VARS}'`
+// A headless run starts in the user's login shell from an empty environment, so none of these, which only a calling
+// agent session sets, should reach it. The script checks that the empty environment worked.
+const SESSION_MARKERS = `compgen -e | grep -E '^(CLAUDECODE|CLAUDE_CODE_ENTRYPOINT|CLAUDE_CODE_SSE_PORT|CODEX_THREAD_ID)$|^CLAUDE_AGENT_SDK_'`
+const loginShell = () => process.env.SHELL || (process.platform === 'darwin' ? '/bin/zsh' : '/bin/bash')
+// The leader's start time tells it apart from a later process that reuses its pid. Its title cannot, because Claude Code rewrites it.
+const pidStart = (pid) => spawnSync('ps', ['-o', 'lstart=', '-p', String(pid)], { encoding: 'utf8', env: { ...process.env, LC_ALL: 'C' } }).stdout?.trim() || null
 
 // A script that starts the agent the way a shell Orca did not open would, and refuses to start it if any trace of Orca is left.
 function orcaFreeScript(r, prompt) {
@@ -934,21 +935,23 @@ done
 export PATH="$NEW"
 `
   const headless = r.surface === 'headless'
-  const clearParent = headless ? `unset $(${PARENT_SESSION_LIST})\n` : ''
-  const parentLeft = headless ? `parent=$(${PARENT_SESSION_LIST} | grep -c .)\n` : ''
+  const markersLeft = headless ? `markers=$(${SESSION_MARKERS})\n` : ''
+  const markersCount = headless ? `, session markers left $(echo -n "$markers" | grep -c .)` : ''
+  const shellNote = headless ? `, shell: ${loginShell()}` : ''
   // set +e: an inherited errexit would end the script where grep -c counts 0.
   const script = `#!/bin/bash
 set +e
 # Starts ${r.agent} ${r.surface} with no ORCA_* variables${r.keep_orca_cli ? '' : ' and no orca binary on PATH'}.
 unset $(compgen -e | grep '^ORCA_')
-${clearParent}${stripPath}cd ${shq(r.testbed)} || exit 1
+${stripPath}cd ${shq(r.testbed)} || exit 1
 left=$(compgen -e | grep -c '^ORCA_')
-${parentLeft}on=$(command -v orca || echo none)
-if [ "$left" != 0 ]${headless ? ' || [ "$parent" != 0 ]' : ''}${r.keep_orca_cli ? '' : ' || [ "$on" != none ]'}; then
-  echo "vp: ORCA vars left $left${headless ? ', parent-session vars left $parent' : ''}, orca on PATH: $on"
+${markersLeft}on=$(command -v orca || echo none)
+if [ "$left" != 0 ]${headless ? ' || [ -n "$markers" ]' : ''}${r.keep_orca_cli ? '' : ' || [ "$on" != none ]'}; then
+  echo "vp: ORCA vars left $left${markersCount}, orca on PATH: $on${shellNote}"${headless ? `
+  [ -n "$markers" ] && echo "vp: session markers left:" $markers` : ''}
   exit 1
 fi
-echo "vp ${r.surface}: ORCA vars left $left${headless ? ', parent-session vars left $parent' : ''}, orca on PATH: $on"
+echo "vp ${r.surface}: ORCA vars left $left${markersCount}, orca on PATH: $on${shellNote}"
 ${exec}
 `
   const file = path.join(runDir(r.id), `${r.surface}.sh`)
@@ -1009,11 +1012,16 @@ function launch(args) {
   if (surface === 'headless') {
     const script = orcaFreeScript(r, prompt)
     const log = fs.openSync(path.join(runDir(id), 'headless.log'), 'a')
-    const child = spawn('bash', [script], { detached: true, stdio: ['ignore', log, log] })
+    const shell = loginShell()
+    const env = { HOME: os.homedir(), USER: os.userInfo().username, LOGNAME: os.userInfo().username, SHELL: shell, TERM: 'dumb', PATH: '/usr/bin:/bin:/usr/sbin:/sbin' }
+    for (const k of ['LANG', 'TMPDIR']) if (process.env[k]) env[k] = process.env[k]
+    // A login, interactive shell reads the user's profile and rc files, as a terminal the user opens would.
+    const child = spawn(shell, ['-lic', `exec bash ${shq(script)}`], { detached: true, stdio: ['ignore', log, log], env })
     child.unref()
     fs.closeSync(log)
     r.kind = 'headless'
     r.pid = child.pid ?? null
+    r.pid_start = r.pid ? pidStart(r.pid) : null
     r.handle = r.pid ? `pid:${r.pid}` : null
     r.launch = { script, log: path.join(runDir(id), 'headless.log') }
   } else if (surface === 'plain') {
@@ -1247,15 +1255,15 @@ function closeRunTerminals(r) {
 
 // detached made the agent the leader of its own process group, so -pid reaches whatever it started too.
 // Never signal without a pid: -0 is vp's own process group. A recorded pid can belong to another process once
-// the run's has exited, so signal only while the leader's command line still names this run.
+// the run's has exited, so signal a live leader only when its start time is the one recorded at launch. A group
+// whose leader is gone keeps its id while it has members, and no new process can take that id, so it is still the run's.
 function stopGroup(r) {
   if (!r.pid) return 'headless run has no pid recorded, nothing to stop'
   if (r.cleaned_at) return `process group ${r.pid}: run already cleaned at ${r.cleaned_at}, nothing signalled`
   if (!alive(-r.pid)) return `process group ${r.pid}: already exited`
-  // The leader is bash running the run's script until it execs the agent, whose prompt carries the marker.
-  const args = sh('ps', ['-ww', '-o', 'args=', '-p', String(r.pid)]).stdout
-  if (!args.includes(r.marker) && !(r.launch?.script && args.includes(r.launch.script)))
-    return `process group ${r.pid}: its leader is not this run (${oneLine(args, 120) || 'no leader'}), so the pid belongs to another process now. Nothing signalled`
+  const started = pidStart(r.pid)
+  if (started && started !== r.pid_start)
+    return `process group ${r.pid}: its leader started ${started}, the run's started ${r.pid_start ?? 'at an unrecorded time'}, so the pid belongs to another process now. Nothing signalled`
   const errors = []
   const signal = (sig) => {
     try {
