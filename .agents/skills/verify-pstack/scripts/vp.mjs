@@ -2,7 +2,7 @@
 // Helper for the verify-pstack skill: drive real agent sessions in the pstack testbed and read what they did.
 // Usage: vp.mjs help
 
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -888,17 +888,27 @@ function loadRun(id) {
 }
 const saveRun = (r) => writeJson(path.join(runDir(r.id), 'run.json'), r)
 
-function plainScript(r, prompt) {
+const claudeFlags = (r) => `${r.model ? ` --model ${r.model}` : ''}${r.effort ? ` --effort ${r.effort}` : ''}`
+const codexFlags = (r) => `${r.model ? ` -m ${r.model}` : ''}${r.effort ? ` -c model_reasoning_effort='"${r.effort}"'` : ''}`
+// The command each Orca-free surface runs, by agent. `p` is the shell expression that expands to the prompt.
+// Headless keeps session persistence on, because vp finds the run by its marker in the session record.
+// codex exec waits for stdin to reach EOF when it is not a terminal, so its stdin is closed.
+const ORCA_FREE = {
+  plain: {
+    claude: (r, p) => `exec claude --dangerously-skip-permissions${claudeFlags(r)} ${p}`,
+    codex: (r, p) => `exec codex${codexFlags(r)} --dangerously-bypass-approvals-and-sandbox ${p}`,
+  },
+  headless: {
+    claude: (r, p) => `exec claude -p --dangerously-skip-permissions${claudeFlags(r)} ${p}`,
+    codex: (r, p) => `exec codex exec --skip-git-repo-check -C '${r.testbed}'${codexFlags(r)} --dangerously-bypass-approvals-and-sandbox ${p} < /dev/null`,
+  },
+}
+
+// A script that starts the agent the way a shell Orca did not open would, and refuses to start it if any trace of Orca is left.
+function orcaFreeScript(r, prompt) {
   const promptFile = path.join(runDir(r.id), 'prompt.txt')
   fs.writeFileSync(promptFile, prompt)
-  const flags =
-    r.agent === 'claude'
-      ? `${r.model ? ` --model ${r.model}` : ''}${r.effort ? ` --effort ${r.effort}` : ''}`
-      : `${r.model ? ` -m ${r.model}` : ''}${r.effort ? ` -c model_reasoning_effort='"${r.effort}"'` : ''}`
-  const exec =
-    r.agent === 'claude'
-      ? `exec claude --dangerously-skip-permissions${flags} "$(cat '${promptFile}')"`
-      : `exec codex${flags} --dangerously-bypass-approvals-and-sandbox "$(cat '${promptFile}')"`
+  const exec = ORCA_FREE[r.surface][r.agent](r, `"$(cat '${promptFile}')"`)
   // --keep-orca-cli leaves the orca binary on PATH: a terminal outside Orca on a computer that has Orca installed.
   const stripPath = r.keep_orca_cli
     ? ''
@@ -916,13 +926,19 @@ done
 export PATH="$NEW"
 `
   const script = `#!/bin/bash
-# Starts ${r.agent} the way a terminal Orca did not open would: no ORCA_* variables${r.keep_orca_cli ? '' : ' and no orca binary on PATH'}.
-unset $(env | grep -o '^ORCA_[A-Za-z_]*')
-${stripPath}cd '${TESTBED}'
-echo "vp plain: ORCA vars left $(env | grep -c '^ORCA_'), orca on PATH: $(command -v orca || echo none)"
+# Starts ${r.agent} ${r.surface} with no ORCA_* variables${r.keep_orca_cli ? '' : ' and no orca binary on PATH'}.
+unset $(compgen -e | grep '^ORCA_')
+${stripPath}cd '${r.testbed}' || exit 1
+left=$(compgen -e | grep -c '^ORCA_')
+on=$(command -v orca || echo none)
+if [ "$left" != 0 ]${r.keep_orca_cli ? '' : ' || [ "$on" != none ]'}; then
+  echo "vp: ORCA vars left $left, orca on PATH: $on"
+  exit 1
+fi
+echo "vp ${r.surface}: ORCA vars left $left, orca on PATH: $on"
 ${exec}
 `
-  const file = path.join(runDir(r.id), 'plain.sh')
+  const file = path.join(runDir(r.id), `${r.surface}.sh`)
   fs.writeFileSync(file, script, { mode: 0o755 })
   return file
 }
@@ -930,15 +946,15 @@ ${exec}
 function launch(args) {
   const { pos, opt } = parseArgs(args, ['ignore-lock', 'keep-orca-cli'])
   const label = pos[0]
-  if (!label || !/^[A-Za-z0-9-]+$/.test(label)) die('vp launch <label> --agent claude|codex|grok [--surface terminal|chat|plain] --prompt "<text>"')
+  if (!label || !/^[A-Za-z0-9-]+$/.test(label)) die('vp launch <label> --agent claude|codex|grok [--surface terminal|chat|plain|headless] --prompt "<text>"')
   const agent = opt.agent
   // Terminal by default: a terminal can be closed from the CLI, a chat cannot.
   const surface = opt.surface || 'terminal'
   if (!DEFAULTS[agent]) die('--agent is claude, codex, or grok')
-  if (!['chat', 'terminal', 'plain'].includes(surface)) die('--surface is chat, terminal, or plain')
-  if (opt.effort && opt.effort !== 'default' && opt.model === 'default') die('Orca takes --effort only with --model')
+  if (!['chat', 'terminal', 'plain', 'headless'].includes(surface)) die('--surface is chat, terminal, plain, or headless')
+  if (ORCA_FREE[surface] && !ORCA_FREE[surface][agent]) die(`no ${surface} recipe for ${agent}. ${surface} runs claude or codex`)
+  if (!ORCA_FREE[surface] && opt.effort && opt.effort !== 'default' && opt.model === 'default') die('Orca takes --effort only with --model')
   if (agent === 'grok' && (opt.model || opt.effort)) die('Orca refuses --model and --effort for grok. Launch without them and read the model from the record')
-  if (surface === 'plain' && agent === 'grok') die('no plain recipe for grok yet')
   if (opt['keep-orca-cli'] && surface !== 'plain') die('--keep-orca-cli is for --surface plain')
   if (!opt.prompt) die('--prompt is required')
   const me = owner()
@@ -977,8 +993,18 @@ function launch(args) {
     fs.cpSync(SELECT_MODEL, path.join(runDir(id), 'real-select-model-backup'), { recursive: true, verbatimSymlinks: true })
     console.log(`copied the real select-model to ${path.join(runDir(id), 'real-select-model-backup')} before this fake-home run`)
   }
-  if (surface === 'plain') {
-    const script = plainScript(r, prompt)
+  if (surface === 'headless') {
+    const script = orcaFreeScript(r, prompt)
+    const log = fs.openSync(path.join(runDir(id), 'headless.log'), 'a')
+    const child = spawn('bash', [script], { detached: true, stdio: ['ignore', log, log] })
+    child.unref()
+    fs.closeSync(log)
+    r.kind = 'headless'
+    r.pid = child.pid ?? null
+    r.handle = r.pid ? `pid:${r.pid}` : null
+    r.launch = { script, log: path.join(runDir(id), 'headless.log') }
+  } else if (surface === 'plain') {
+    const script = orcaFreeScript(r, prompt)
     const res = orca(['terminal', 'create', '--worktree', `path:${TESTBED}`, '--title', `vp-${id}`, '--command', `bash '${script}'`])
     r.launch = res.data ?? res.raw
     r.handle = res.result?.terminal?.handle ?? null
@@ -1000,7 +1026,8 @@ function launch(args) {
   console.log(`run ${id}: ${agent} ${surface} ${r.model ?? ''} ${r.effort ?? ''}, handle ${r.handle}${r.prompt_outcome ? `, prompt ${r.prompt_outcome}` : ''}`)
   if (surface === 'chat' && r.kind !== 'structured') console.log(`Orca opened a ${r.kind} instead of a chat: ${receiptDetail(r.launch)}`)
   console.log(`select-model at launch: ${r.before.select_model.kind}. Evidence: ${runDir(id)}`)
-  if (surface === 'plain') console.log(`next: vp screen ${id} (answer the trust or bypass prompt with vp key), then vp wait ${id}`)
+  if (surface === 'headless') console.log(`log: ${r.launch.log}. next: vp wait ${id}`)
+  else if (surface === 'plain') console.log(`next: vp screen ${id} (answer the trust or bypass prompt with vp key), then vp wait ${id}`)
   else console.log(`next: vp wait ${id}`)
 }
 
@@ -1020,6 +1047,19 @@ const runKind = (r) => r.kind ?? (r.surface === 'chat' ? 'structured' : 'termina
 // Claude Code asks "Do you want to proceed?" with a "don't ask again" option. Codex asks "Would you like to run the following command?".
 const PERMISSION_PROMPT = /Do you want to (proceed|make this edit|create)|don't ask again|Would you like to run|Allow command\?|approve this/i
 
+const alive = (pid) => {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (e) {
+    return e.code === 'EPERM'
+  }
+}
+const logTail = (r, n = 20) => {
+  const p = path.join(runDir(r.id), 'headless.log')
+  return exists(p) ? fs.readFileSync(p, 'utf8').split('\n').filter((l) => l.trim()).slice(-n).join('\n') : `(no ${p})`
+}
+
 function screenTail(r) {
   const res = orca(['terminal', 'read', '--terminal', r.handle])
   return (res.result?.terminal?.tail || []).filter((l) => l.trim()).join('\n')
@@ -1033,8 +1073,14 @@ function wait(args) {
   const t0 = Date.now()
   let lastReport = 0
   for (;;) {
+    // Read before locating, so a record written just before the exit is still found.
+    const exited = runKind(r) === 'headless' && !alive(r.pid)
     const file = locate(r)
     const elapsed = Math.round((Date.now() - t0) / 1000)
+    if (!file && exited) {
+      console.log(`run ${r.id}: the process exited and no record carries ${r.marker}. Last lines of headless.log:\n${logTail(r)}`)
+      process.exit(1)
+    }
     if (file) {
       const rec = parseRecord(r.agent, file)
       const probe = r.agent === 'grok' ? path.join(file, 'chat_history.jsonl') : file
@@ -1043,9 +1089,13 @@ function wait(args) {
         console.log(`run ${r.id} is waiting on a question after ${rec.calls.length} tool calls. Read it with vp read ${r.id}`)
         process.exit(3)
       }
-      if (rec.done && idle >= quiet) {
+      if (rec.done && (idle >= quiet || exited)) {
         console.log(`run ${r.id} finished: ${rec.calls.length} tool calls. Next: vp read ${r.id}`)
         return
+      }
+      if (exited) {
+        console.log(`run ${r.id}: the process exited before its record showed the turn ended. Last lines of headless.log:\n${logTail(r)}`)
+        process.exit(1)
       }
       const pending = rec.calls.filter((c) => c.result === undefined)
       if (!rec.done && pending.length && idle >= quiet && runKind(r) === 'terminal') {
@@ -1115,7 +1165,8 @@ function read(args) {
 
 function screen(args) {
   const r = loadRun(args[0])
-  if ((r.kind ?? (r.surface === 'chat' ? 'structured' : 'terminal')) !== 'terminal') die('a chat has no terminal screen. Use vp read')
+  if (runKind(r) === 'headless') return console.log(`${logTail(r, 40)}\n(process ${r.pid} ${alive(r.pid) ? 'running' : 'exited'})`)
+  if (runKind(r) !== 'terminal') die('a chat has no terminal screen. Use vp read')
   const res = orca(['terminal', 'read', '--terminal', r.handle])
   if (!res.ok) die(oneLine(res.raw.stderr || res.raw.stdout, 300))
   console.log((res.result?.terminal?.tail || []).filter((l) => l.trim()).join('\n'))
@@ -1123,6 +1174,7 @@ function screen(args) {
 
 function key(args) {
   const r = loadRun(args[0])
+  if (runKind(r) !== 'terminal') die(`a ${runKind(r)} run takes no input`)
   const what = args.slice(1).join(' ')
   const keys = { down: '\u001b[B', up: '\u001b[A' }
   const a = ['terminal', 'send', '--terminal', r.handle]
@@ -1186,8 +1238,18 @@ function cleanup(args) {
   const dir = runDir(r.id)
   const since = Date.parse(r.started_at) - 5000
   const log = []
-  const kind = r.kind ?? (r.surface === 'chat' ? 'structured' : 'terminal')
-  if (r.handle && kind === 'terminal') {
+  const kind = runKind(r)
+  // detached made the agent the leader of its own process group, so -pid reaches whatever it started too.
+  // Never signal without a pid: -0 is vp's own process group.
+  if (kind === 'headless' && !r.pid) log.push('headless run has no pid recorded, nothing to stop')
+  else if (kind === 'headless') {
+    if (alive(-r.pid)) {
+      process.kill(-r.pid, 'SIGTERM')
+      sleep(2000)
+      if (alive(-r.pid)) process.kill(-r.pid, 'SIGKILL')
+      log.push(`process group ${r.pid}: was still running, stopped${alive(-r.pid) ? ', BUT IT IS STILL ALIVE' : ''}`)
+    } else log.push(`process group ${r.pid}: already exited`)
+  } else if (r.handle && kind === 'terminal') {
     const res = closeRunTerminals(r)
     log.push(res.note)
     r.closed = res.ok
@@ -1365,12 +1427,13 @@ const HELP = `vp.mjs: drive pstack skills in real agent sessions (see ../SKILL.m
   sm status|lock "<purpose>"|place [--from <dir>]|remove|stash --approved "<words>"|restore|release|break --approved "<words>"
                                   the shared ~/.agents/skills/select-model and its lock
   fakehome <name> [--sample] [--from <dir>]   a throwaway home under /tmp for generator runs
-  launch <label> --agent claude|codex|grok [--surface terminal|chat|plain] --prompt "<text>"
+  launch <label> --agent claude|codex|grok [--surface terminal|chat|plain|headless] --prompt "<text>"
          [--model <id>|default] [--effort <level>|default] [--fakehome <dir>] [--ignore-lock] [--keep-orca-cli]
-  wait <run> [--timeout 240] [--quiet 20]    exit 0 finished, 2 still running, 3 asking a question, 4 at a permission prompt
+  wait <run> [--timeout 240] [--quiet 20]    exit 0 finished, 1 headless process ended unfinished, 2 still running, 3 asking a question, 4 at a permission prompt
   read <run> [--width 160] | read --record <file> [--agent claude|codex|grok]
-  screen <run> | key <run> down|up|enter|"<text>"   terminal and plain runs only
-  cleanup <run> [--tmp] [--revert]   close the run's terminal tab and what it started; evidence stays
+  screen <run>                    a terminal or plain run's screen, or the tail of a headless run's log
+  key <run> down|up|enter|"<text>"   terminal and plain runs only
+  cleanup <run> [--tmp] [--revert]   close the run's terminal tab or stop its headless process group, and what it started; evidence stays
   runs                            list runs under ${EVIDENCE}
   whoami                          the owner name vp uses here, and how other sessions reach you
 
