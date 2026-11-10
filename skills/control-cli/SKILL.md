@@ -37,14 +37,29 @@ Exercise an interactive CLI with a repeatable harness instead of trying it by ha
 - **A runtime inspector.** The Node or Bun inspector for CPU profiles, heap snapshots, and live evaluation. `inspect-runtime` says how to attach here.
 - **A terminal recorder.** The repository's demo tools, or an asciinema-compatible recorder, when the user asks for a demo.
 
+`<scratch>` below is a folder from `mktemp -d`.
+
 ## A minimal tmux harness
+
+`wait_for` polls the screen until a pattern appears, so no step waits a fixed time. It fails at once when the program has exited and taken its session with it. `capture-pane` drops trailing spaces, so match a prompt such as `> ` as `^>$`.
 
 ```bash
 SESSION="cli-harness-$(date +%s)"
+wait_for() {
+  for _ in $(seq 100); do
+    screen=$(tmux capture-pane -pt "$SESSION") || return 1
+    grep -q -- "$1" <<<"$screen" && return 0
+    sleep 0.1
+  done
+  echo "timed out waiting for: $1" >&2
+  return 1
+}
 tmux new-session -d -s "$SESSION" -- <command-under-test>
-tmux capture-pane -pt "$SESSION"
+wait_for "<ready pattern>"
+tmux capture-pane -pt "$SESSION" > <scratch>/before.txt
 tmux send-keys -t "$SESSION" "help" Enter
-tmux capture-pane -pt "$SESSION"
+wait_for "<text the answer prints>"
+tmux capture-pane -pt "$SESSION" > <scratch>/after.txt
 tmux kill-session -t "$SESSION"
 ```
 

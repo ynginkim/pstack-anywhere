@@ -21,6 +21,6 @@ Use the caller's files or diff. Otherwise use the current branch's diff against 
 
 ## Rules
 
-- Keep behavior the same, unless the edit fixes a clear bug. Name that bug in the summary.
+- Keep behavior the same, unless the edit fixes a clear bug.
 - Make small, local edits. Do not rewrite a function to remove one line.
-- End with a summary of one to three sentences.
+- Reply in one to three sentences. Say what you removed, and name any bug you fixed.
