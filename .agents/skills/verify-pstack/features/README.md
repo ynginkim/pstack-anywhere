@@ -42,4 +42,5 @@ Each feature file starts with an H1 title and one paragraph describing the behav
 - [Spawn](spawn.md) covers where a seat runs: your own subagent, an Orca worker, or your own model when Orca is missing.
 - [Runtime model choice](runtime.md) covers reading `select-model` per task, and the fallback when it is missing.
 - [Generator](generator.md) covers `/setup-pstack` writing `select-model`, proving it, and linking it.
+- [Team-kit skills](team-kit.md) covers `deslop`, `control-ui`, and `control-cli`, the skills adapted from Cursor's team kit.
 - [Cross-model skills](cross-model.md) covers `how`, `swarm`, `interrogate`, `arena`, `reflect`, `why`, and `architect` placing their seats.

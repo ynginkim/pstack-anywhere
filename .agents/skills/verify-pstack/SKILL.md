@@ -23,6 +23,7 @@ Every run spends usage, and an earlier session already hit its monthly limit. Ch
 | `setup-pstack` or `create-model-selection-skill` | One generator run, Claude terminal, fake home | [generator](features/generator.md) |
 | The generator's link question | One generator run that answers the link question, fake home | [generator](features/generator.md) |
 | A cross-model skill (`arena`, `swarm`, `interrogate`, `reflect`, `architect`, `how`, `why`) | One run of that skill on a small read-only task, Claude terminal. `why` and `architect` stop at the plan. | [cross-model](features/cross-model.md) |
+| `deslop`, `control-ui`, or `control-cli` | One run of that skill on its fixture, Claude headless, or an Orca terminal for `control-ui` | [team-kit](features/team-kit.md) |
 | A line only Codex reads differently (`$name`, `update_plan`, `CODEX_HOME`, rollout paths) | The same check once more, Codex terminal | the same feature |
 | Behavior only an Orca chat shows | The same check once more, `--surface chat` | the same feature |
 | A rule for a session without Orca | The same check once more, plain surface, or headless when Orca must not start it either | the same feature |
