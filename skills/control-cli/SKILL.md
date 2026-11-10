@@ -119,9 +119,15 @@ try:
     os.write(master_fd, b"help\n")
     print(read_until(master_fd, b"<text the answer prints>").decode(errors="replace"))
 finally:
-    proc.terminate()
-    proc.wait(timeout=5)
-    os.close(master_fd)
+    try:
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
+    finally:
+        os.close(master_fd)
 ```
 
 If the CLI needs richer terminal control, use `pty.fork()` or a PTY library the project already has.
