@@ -42,6 +42,8 @@ const readJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'))
 const writeJson = (p, d) => fs.writeFileSync(p, `${JSON.stringify(d, null, 2)}\n`)
 const iso = (ms = Date.now()) => new Date(ms).toISOString()
 const oneLine = (s, width) => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, width)
+// Quotes a value for a bash command line or script. Every path vp writes into one goes through this.
+const shq = (s) => `'${String(s).replaceAll("'", `'\\''`)}'`
 
 function parseArgs(argv, booleans = []) {
   const pos = []
@@ -900,18 +902,21 @@ const ORCA_FREE = {
   },
   headless: {
     claude: (r, p) => `exec claude -p --dangerously-skip-permissions${claudeFlags(r)} ${p}`,
-    codex: (r, p) => `exec codex exec --skip-git-repo-check -C '${r.testbed}'${codexFlags(r)} --dangerously-bypass-approvals-and-sandbox ${p} < /dev/null`,
+    codex: (r, p) => `exec codex exec --skip-git-repo-check -C ${shq(r.testbed)}${codexFlags(r)} --dangerously-bypass-approvals-and-sandbox ${p} < /dev/null`,
   },
 }
 
-// Variables a calling agent session exports, which a user's own shell does not have. CLAUDE_CONFIG_DIR and CODEX_HOME are the user's settings and stay.
+// Variables a calling agent session exports, which a user's own shell does not have.
 const PARENT_SESSION_VARS = '^(CLAUDECODE|CLAUDE_CODE_|CLAUDE_AGENT_SDK_|CODEX_SANDBOX|CODEX_THREAD_ID)'
+// The user's own settings, which a shell may export under the same prefixes. These stay.
+const USER_SETTING_VARS = '^(CLAUDE_CONFIG_DIR|CODEX_HOME|CLAUDE_CODE_OAUTH_TOKEN|CLAUDE_CODE_USE_(BEDROCK|VERTEX|FOUNDRY)|CLAUDE_CODE_SKIP_(BEDROCK|VERTEX|FOUNDRY)_AUTH)$'
+const PARENT_SESSION_LIST = `compgen -e | grep -E '${PARENT_SESSION_VARS}' | grep -vE '${USER_SETTING_VARS}'`
 
 // A script that starts the agent the way a shell Orca did not open would, and refuses to start it if any trace of Orca is left.
 function orcaFreeScript(r, prompt) {
   const promptFile = path.join(runDir(r.id), 'prompt.txt')
   fs.writeFileSync(promptFile, prompt)
-  const exec = ORCA_FREE[r.surface][r.agent](r, `"$(cat '${promptFile}')"`)
+  const exec = ORCA_FREE[r.surface][r.agent](r, `"$(cat ${shq(promptFile)})"`)
   // --keep-orca-cli leaves the orca binary on PATH: a terminal outside Orca on a computer that has Orca installed.
   const stripPath = r.keep_orca_cli
     ? ''
@@ -929,12 +934,14 @@ done
 export PATH="$NEW"
 `
   const headless = r.surface === 'headless'
-  const clearParent = headless ? `unset $(compgen -e | grep -E '${PARENT_SESSION_VARS}')\n` : ''
-  const parentLeft = headless ? `parent=$(compgen -e | grep -cE '${PARENT_SESSION_VARS}')\n` : ''
+  const clearParent = headless ? `unset $(${PARENT_SESSION_LIST})\n` : ''
+  const parentLeft = headless ? `parent=$(${PARENT_SESSION_LIST} | grep -c .)\n` : ''
+  // set +e: an inherited errexit would end the script where grep -c counts 0.
   const script = `#!/bin/bash
+set +e
 # Starts ${r.agent} ${r.surface} with no ORCA_* variables${r.keep_orca_cli ? '' : ' and no orca binary on PATH'}.
 unset $(compgen -e | grep '^ORCA_')
-${clearParent}${stripPath}cd '${r.testbed}' || exit 1
+${clearParent}${stripPath}cd ${shq(r.testbed)} || exit 1
 left=$(compgen -e | grep -c '^ORCA_')
 ${parentLeft}on=$(command -v orca || echo none)
 if [ "$left" != 0 ]${headless ? ' || [ "$parent" != 0 ]' : ''}${r.keep_orca_cli ? '' : ' || [ "$on" != none ]'}; then
@@ -1011,7 +1018,7 @@ function launch(args) {
     r.launch = { script, log: path.join(runDir(id), 'headless.log') }
   } else if (surface === 'plain') {
     const script = orcaFreeScript(r, prompt)
-    const res = orca(['terminal', 'create', '--worktree', `path:${TESTBED}`, '--title', `vp-${id}`, '--command', `bash '${script}'`])
+    const res = orca(['terminal', 'create', '--worktree', `path:${TESTBED}`, '--title', `vp-${id}`, '--command', `bash ${shq(script)}`])
     r.launch = res.data ?? res.raw
     r.handle = res.result?.terminal?.handle ?? null
     r.kind = 'terminal'
@@ -1238,6 +1245,31 @@ function closeRunTerminals(r) {
   return { ok: true, note: `terminal: ${notes.join('; ')}. No longer listed in the testbed` }
 }
 
+// detached made the agent the leader of its own process group, so -pid reaches whatever it started too.
+// Never signal without a pid: -0 is vp's own process group. A recorded pid can belong to another process once
+// the run's has exited, so signal only while the leader's command line still names this run.
+function stopGroup(r) {
+  if (!r.pid) return 'headless run has no pid recorded, nothing to stop'
+  if (r.cleaned_at) return `process group ${r.pid}: run already cleaned at ${r.cleaned_at}, nothing signalled`
+  if (!alive(-r.pid)) return `process group ${r.pid}: already exited`
+  // The leader is bash running the run's script until it execs the agent, whose prompt carries the marker.
+  const args = sh('ps', ['-ww', '-o', 'args=', '-p', String(r.pid)]).stdout
+  if (!args.includes(r.marker) && !(r.launch?.script && args.includes(r.launch.script)))
+    return `process group ${r.pid}: its leader is not this run (${oneLine(args, 120) || 'no leader'}), so the pid belongs to another process now. Nothing signalled`
+  const errors = []
+  const signal = (sig) => {
+    try {
+      process.kill(-r.pid, sig)
+    } catch (e) {
+      if (e.code !== 'ESRCH') errors.push(`${sig} failed: ${e.message}`)
+    }
+  }
+  signal('SIGTERM')
+  sleep(2000)
+  if (alive(-r.pid)) signal('SIGKILL')
+  return `process group ${r.pid}: was still running, stopped${errors.length ? `, ${errors.join(', ')}` : ''}${alive(-r.pid) ? ', BUT IT IS STILL ALIVE' : ''}`
+}
+
 function cleanup(args) {
   const { pos, opt } = parseArgs(args, ['revert', 'tmp'])
   const r = loadRun(pos[0])
@@ -1245,17 +1277,8 @@ function cleanup(args) {
   const since = Date.parse(r.started_at) - 5000
   const log = []
   const kind = runKind(r)
-  // detached made the agent the leader of its own process group, so -pid reaches whatever it started too.
-  // Never signal without a pid: -0 is vp's own process group.
-  if (kind === 'headless' && !r.pid) log.push('headless run has no pid recorded, nothing to stop')
-  else if (kind === 'headless') {
-    if (alive(-r.pid)) {
-      process.kill(-r.pid, 'SIGTERM')
-      sleep(2000)
-      if (alive(-r.pid)) process.kill(-r.pid, 'SIGKILL')
-      log.push(`process group ${r.pid}: was still running, stopped${alive(-r.pid) ? ', BUT IT IS STILL ALIVE' : ''}`)
-    } else log.push(`process group ${r.pid}: already exited`)
-  } else if (r.handle && kind === 'terminal') {
+  if (kind === 'headless') log.push(stopGroup(r))
+  else if (r.handle && kind === 'terminal') {
     const res = closeRunTerminals(r)
     log.push(res.note)
     r.closed = res.ok
