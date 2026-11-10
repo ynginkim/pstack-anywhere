@@ -7,7 +7,7 @@ This map is the maintained list of what verify-pstack can prove about pstack's s
 - `$VP doctor` has no `FAIL` line, with `VP=.agents/skills/verify-pstack/scripts/vp.mjs` from the repo root.
 - The skills your change touched are synced into the testbed with `$VP sync <name>...`.
 - `select-model` is in the state the feature file names, set by the Shared state rules in `../SKILL.md`.
-- Orca is running. Every surface except plain starts through `orca agent launch`.
+- Orca is running, unless every run is headless. Terminal and chat start through `orca agent launch`, plain through `orca terminal create`, and headless through the user's login shell with no Orca.
 
 ## Driving conventions
 

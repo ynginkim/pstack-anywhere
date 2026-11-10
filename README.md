@@ -6,7 +6,7 @@ It is [poteto](https://x.com/poteto)'s pstack, first published in [`cursor/plugi
 
 ## What this fork changes
 
-- **A step names what it needs, not a tool.** A skill says `spawn-worker`, `ask-user`, or `wake-on-event`. The [`resolve-capability`](./skills/resolve-capability/SKILL.md) skill says how each one is done in your environment, and what to do when it cannot be. When Claude Code, Codex, Grok, or Orca change, that skill changes and the others stay put. [`docs/resolve-capability-design.md`](./docs/resolve-capability-design.md) has the design.
+- **A step names what it needs, not a tool.** A skill says `spawn-worker`, `ask-user`, or `wake-on-event`. The [`resolve-capability`](./skills/resolve-capability/SKILL.md) skill is the contract: what each capability means, whose mechanism answers it, and what to do when nothing can. Each product's facts live in its own adapter under [`resolve-capability/adapters/`](./skills/resolve-capability/adapters/). When Claude Code, Codex, Grok, or Orca change, that product's adapter changes and the other skills stay put. Removing a product means deleting its adapter folder, and adding one means adding a folder. [`docs/harness-adapters-design.md`](./docs/harness-adapters-design.md) has the design.
 - **Models are chosen for the task, from your own setup.** `/setup-pstack` surveys the agent products and models on your computer, asks about your budget and preferences, and writes a `select-model` skill. A task reads it and decides which model to use and how: stay in the session, a subagent, another vendor's agent as a worker, or several models together. [`docs/select-model-design.md`](./docs/select-model-design.md) has the design.
 - **Orca is an enhancement.** Without it, a session still starts another vendor's agent by running that product's CLI (`codex exec`, `claude -p`, `grok -p`). Orca adds supervised workers, durable runs, an inbox, schedules, and remote environments.
 - **Cursor-only features are gone.** [`docs/removed-cursor-features.md`](./docs/removed-cursor-features.md) records each one, what replaces it, and how to rebuild it.
@@ -99,7 +99,7 @@ It comes with twenty-three playbooks:
 When invoked it:
 
 1. matches your task to a [playbook](./skills/poteto-mode/playbooks/) and opens a plan whose first items are its steps, copied in verbatim.
-2. reads `select-model` and the `resolve-capability` adapter, and decides which model runs each piece of work and how.
+2. runs `detect.sh` first, reads `resolve-capability` with the adapters for its harness and for each environment found, reads `select-model`, and decides which model runs each piece of work and how.
 3. routes to the other skills as the steps fire.
 4. writes unslopped replies framed for the consumer and the maintainer.
 
@@ -141,7 +141,7 @@ For work that runs for hours, give the run a loop or a schedule: `/loop` in Clau
 | [`/automate-me`](./skills/automate-me/SKILL.md) | you want your own `-mode` skill, drafted from how you've actually worked. |
 | [`/setup-pstack`](./skills/setup-pstack/SKILL.md) | you want pstack set up for this computer and for you. surveys the agent products and models you have, asks about your budget and preferences, and generates the `select-model` skill that every task reads to choose its models. |
 | [`/create-model-selection-skill`](./skills/create-model-selection-skill/SKILL.md) | `/setup-pstack` runs it for you. surveys this computer, asks the preference questions, and writes `select-model`. |
-| [`resolve-capability`](./skills/resolve-capability/SKILL.md) | not something you type. the adapter that other skills read: it says how each thing a step asks for (start a worker, ask you, wait for an event) is done in claude code, codex, grok, and orca. |
+| [`resolve-capability`](./skills/resolve-capability/SKILL.md) | not something you type. the contract that other skills read, with one adapter per product under `adapters/` (claude code, codex, grok, orca). together they say how each thing a step asks for (start a worker, ask you, wait for an event) is done where you are. |
 | [`/reflect`](./skills/reflect/SKILL.md) | a long task landed and you want the recipe captured as a skill edit. |
 | [`/correct`](./skills/correct/SKILL.md) | you keep correcting agents for the same mistakes. mines history for mistake classes, fixes each at the highest level that works (architecture, then types, lint, and ci, then tests, with docs last), and keeps a table pairing each rule with what enforces it. |
 | [`/teach`](./skills/teach/SKILL.md) | you want to actually understand a change or subsystem, not just have it summarized. runs how + why and weaves one plain explanation, built up diagram by diagram. |
@@ -274,8 +274,8 @@ Models are configurable too. Run [`/setup-pstack`](./skills/setup-pstack/SKILL.m
 
 PRs are welcome. Before you open one:
 
-- `node scripts/lint-rewritten.mjs` keeps Cursor wording and product names out of rewritten skills. A skill names capabilities, and the adapter holds the products.
-- [`.agents/skills/verify-pstack`](./.agents/skills/verify-pstack/SKILL.md) proves a change by running it in real Claude Code, Codex, and Grok sessions through Orca. It is for contributors and is not installed by the `skills` CLI.
+- `node scripts/lint-rewritten.mjs` keeps Cursor wording and product names out of rewritten skills. A skill names capabilities, and each product's adapter holds that product's facts. `node scripts/check-ownership.mjs` fails when a product's name or tool appears outside its own adapter.
+- [`.agents/skills/verify-pstack`](./.agents/skills/verify-pstack/SKILL.md) proves a change by running it in real Claude Code, Codex, and Grok sessions, through Orca or headless with no Orca at all. It is for contributors and is not installed by the `skills` CLI.
 - [`MIRROR.md`](./MIRROR.md) says how upstream changes arrive: as a weekly issue, not as a merge.
 - [`CURSOR-DEPENDENCIES.md`](./CURSOR-DEPENDENCIES.md) lists the Cursor-dependent lines that have not been rewritten yet.
 

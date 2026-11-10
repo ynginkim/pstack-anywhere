@@ -2,7 +2,7 @@
 // Helper for the verify-pstack skill: drive real agent sessions in the pstack testbed and read what they did.
 // Usage: vp.mjs help
 
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -42,6 +42,8 @@ const readJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'))
 const writeJson = (p, d) => fs.writeFileSync(p, `${JSON.stringify(d, null, 2)}\n`)
 const iso = (ms = Date.now()) => new Date(ms).toISOString()
 const oneLine = (s, width) => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, width)
+// Quotes a value for a bash command line or script. Every path vp writes into one goes through this.
+const shq = (s) => `'${String(s).replaceAll("'", `'\\''`)}'`
 
 function parseArgs(argv, booleans = []) {
   const pos = []
@@ -409,12 +411,13 @@ function sync(args) {
 
 // ---------- session records ----------
 
-const claudeProjectDirs = (cwd) =>
-  [...new Set([process.env.CLAUDE_CONFIG_DIR, path.join(HOME, '.claude')].filter(Boolean))].map((d) => path.join(d, 'projects', cwd.replace(/[^a-zA-Z0-9]/g, '-')))
+// `extra` holds config dirs a run used that vp's own environment does not name (see runHomes).
+const claudeProjectDirs = (cwd, extra = []) =>
+  [...new Set([...extra, process.env.CLAUDE_CONFIG_DIR, path.join(HOME, '.claude')].filter(Boolean))].map((d) => path.join(d, 'projects', cwd.replace(/[^a-zA-Z0-9]/g, '-')))
 
-function codexRolloutFiles(sinceMs) {
+function codexRolloutFiles(sinceMs, extra = []) {
   // An Orca terminal sets CODEX_HOME to an account home, so the same folder can come up twice.
-  const homes = [process.env.CODEX_HOME, path.join(HOME, '.codex')].filter(Boolean)
+  const homes = [...extra, process.env.CODEX_HOME, path.join(HOME, '.codex')].filter(Boolean)
   const accounts = path.join(ORCA_DATA, 'codex-accounts')
   if (exists(accounts)) for (const a of fs.readdirSync(accounts)) homes.push(path.join(accounts, a, 'home'))
   const roots = [...new Set(homes.map((h) => path.resolve(h, 'sessions')))]
@@ -434,13 +437,13 @@ function codexRolloutFiles(sinceMs) {
 
 const grokSessionsDir = (cwd) => path.join(HOME, '.grok/sessions', encodeURIComponent(cwd))
 
-function candidates(agent, cwd, sinceMs) {
+function candidates(agent, cwd, sinceMs, extra = []) {
   if (agent === 'claude')
-    return claudeProjectDirs(cwd)
+    return claudeProjectDirs(cwd, extra)
       .filter(exists)
       .flatMap((d) => fs.readdirSync(d).filter((f) => f.endsWith('.jsonl')).map((f) => path.join(d, f)))
       .filter((f) => fs.statSync(f).mtimeMs >= sinceMs)
-  if (agent === 'codex') return codexRolloutFiles(sinceMs)
+  if (agent === 'codex') return codexRolloutFiles(sinceMs, extra)
   if (agent === 'grok') {
     const d = grokSessionsDir(cwd)
     if (!exists(d)) return []
@@ -592,9 +595,9 @@ function parseGrok(dir) {
 
 const parseRecord = (agent, file) => (agent === 'claude' ? parseClaude(file) : agent === 'codex' ? parseCodex(file) : parseGrok(file))
 
-function findRecord(agent, cwd, marker, sinceMs) {
+function findRecord(agent, cwd, marker, sinceMs, extra = []) {
   const hits = []
-  for (const f of candidates(agent, cwd, sinceMs)) {
+  for (const f of candidates(agent, cwd, sinceMs, extra)) {
     let rec
     try {
       rec = parseRecord(agent, f)
@@ -888,17 +891,54 @@ function loadRun(id) {
 }
 const saveRun = (r) => writeJson(path.join(runDir(r.id), 'run.json'), r)
 
-function plainScript(r, prompt) {
+const claudeFlags = (r) => `${r.model ? ` --model ${r.model}` : ''}${r.effort ? ` --effort ${r.effort}` : ''}`
+const codexFlags = (r) => `${r.model ? ` -m ${r.model}` : ''}${r.effort ? ` -c model_reasoning_effort='"${r.effort}"'` : ''}`
+// The command each Orca-free surface runs, by agent. `p` is the shell expression that expands to the prompt.
+// Headless keeps session persistence on, because vp finds the run by its marker in the session record.
+// codex exec waits for stdin to reach EOF when it is not a terminal, so its stdin is closed.
+const ORCA_FREE = {
+  plain: {
+    claude: (r, p) => `exec claude --dangerously-skip-permissions${claudeFlags(r)} ${p}`,
+    codex: (r, p) => `exec codex${codexFlags(r)} --dangerously-bypass-approvals-and-sandbox ${p}`,
+  },
+  headless: {
+    claude: (r, p) => `exec claude -p --dangerously-skip-permissions${claudeFlags(r)} ${p}`,
+    codex: (r, p) => `exec codex exec --skip-git-repo-check -C ${shq(r.testbed)}${codexFlags(r)} --dangerously-bypass-approvals-and-sandbox ${p} < /dev/null`,
+  },
+}
+
+// A headless run starts in the user's login shell from an empty environment, so none of these, which only a calling
+// agent session sets, should reach it. The script checks that the empty environment worked.
+const SESSION_MARKERS = `compgen -e | grep -E '^(CLAUDECODE|CLAUDE_CODE_ENTRYPOINT|CLAUDE_CODE_SSE_PORT|CODEX_THREAD_ID)$|^CLAUDE_AGENT_SDK_'`
+const loginShell = () => process.env.SHELL || (process.platform === 'darwin' ? '/bin/zsh' : '/bin/bash')
+// The leader's start time tells it apart from a later process that reuses its pid. Its title cannot, because Claude Code rewrites it.
+// A sandbox can refuse ps, so only a clean "no such process" counts as absent.
+function pidStart(pid) {
+  const p = spawnSync('ps', ['-o', 'lstart=', '-p', String(pid)], { encoding: 'utf8', env: { ...process.env, LC_ALL: 'C' } })
+  if (p.error) return { state: 'unknown', why: `ps did not run: ${p.error.message}` }
+  if (p.signal || p.status === null) return { state: 'unknown', why: `ps was ended by ${p.signal ?? 'an unknown cause'}` }
+  if (p.stderr.trim()) return { state: 'unknown', why: `ps exited ${p.status} saying ${oneLine(p.stderr, 200)}` }
+  const start = p.stdout.trim()
+  if (p.status === 0 && start) return { state: 'running', start }
+  if (p.status !== 0 && !start) return { state: 'absent' }
+  return { state: 'unknown', why: `ps exited ${p.status} printing "${oneLine(start, 100)}"` }
+}
+
+// Whether a headless run's own leader still runs: its pid is alive with the start time recorded at launch.
+function runLeader(r) {
+  const s = pidStart(r.pid)
+  if (s.state === 'unknown') return s
+  if (s.state === 'absent') return { state: 'gone', why: `no process ${r.pid}` }
+  if (!r.pid_start) return { state: 'unknown', why: `process ${r.pid} is alive, but no start time was recorded at launch to tell it is the run's` }
+  if (s.start === r.pid_start) return { state: 'running' }
+  return { state: 'gone', reused: true, why: `process ${r.pid} started ${s.start}, the run's started ${r.pid_start}` }
+}
+
+// A script that starts the agent the way a shell Orca did not open would, and refuses to start it if any trace of Orca is left.
+function orcaFreeScript(r, prompt) {
   const promptFile = path.join(runDir(r.id), 'prompt.txt')
   fs.writeFileSync(promptFile, prompt)
-  const flags =
-    r.agent === 'claude'
-      ? `${r.model ? ` --model ${r.model}` : ''}${r.effort ? ` --effort ${r.effort}` : ''}`
-      : `${r.model ? ` -m ${r.model}` : ''}${r.effort ? ` -c model_reasoning_effort='"${r.effort}"'` : ''}`
-  const exec =
-    r.agent === 'claude'
-      ? `exec claude --dangerously-skip-permissions${flags} "$(cat '${promptFile}')"`
-      : `exec codex${flags} --dangerously-bypass-approvals-and-sandbox "$(cat '${promptFile}')"`
+  const exec = ORCA_FREE[r.surface][r.agent](r, `"$(cat ${shq(promptFile)})"`)
   // --keep-orca-cli leaves the orca binary on PATH: a terminal outside Orca on a computer that has Orca installed.
   const stripPath = r.keep_orca_cli
     ? ''
@@ -915,14 +955,32 @@ for d in "\${DIRS[@]}"; do
 done
 export PATH="$NEW"
 `
-  const script = `#!/bin/bash
-# Starts ${r.agent} the way a terminal Orca did not open would: no ORCA_* variables${r.keep_orca_cli ? '' : ' and no orca binary on PATH'}.
-unset $(env | grep -o '^ORCA_[A-Za-z_]*')
-${stripPath}cd '${TESTBED}'
-echo "vp plain: ORCA vars left $(env | grep -c '^ORCA_'), orca on PATH: $(command -v orca || echo none)"
-${exec}
+  const headless = r.surface === 'headless'
+  const markersLeft = headless ? `markers=$(${SESSION_MARKERS})\n` : ''
+  // The rc files can set where the agent writes its record. vp searches there too (runHomes).
+  const envFile = headless
+    ? `printf '%s\\0' "CLAUDE_CONFIG_DIR=$CLAUDE_CONFIG_DIR" "CODEX_HOME=$CODEX_HOME" > ${shq(path.join(runDir(r.id), 'headless-env'))}
 `
-  const file = path.join(runDir(r.id), 'plain.sh')
+    : ''
+  const markersCount = headless ? `, session markers left $(echo -n "$markers" | grep -c .)` : ''
+  const shellNote = headless ? `, shell: ${loginShell()}` : ''
+  // set +e: an inherited errexit would end the script where grep -c counts 0.
+  const script = `#!/bin/bash
+set +e
+# Starts ${r.agent} ${r.surface} with no ORCA_* variables${r.keep_orca_cli ? '' : ' and no orca binary on PATH'}.
+unset $(compgen -e | grep '^ORCA_')
+${stripPath}cd ${shq(r.testbed)} || exit 1
+left=$(compgen -e | grep -c '^ORCA_')
+${markersLeft}on=$(command -v orca || echo none)
+if [ "$left" != 0 ]${headless ? ' || [ -n "$markers" ]' : ''}${r.keep_orca_cli ? '' : ' || [ "$on" != none ]'}; then
+  echo "vp: ORCA vars left $left${markersCount}, orca on PATH: $on${shellNote}"${headless ? `
+  [ -n "$markers" ] && echo "vp: session markers left:" $markers` : ''}
+  exit 1
+fi
+echo "vp ${r.surface}: ORCA vars left $left${markersCount}, orca on PATH: $on${shellNote}"
+${envFile}${exec}
+`
+  const file = path.join(runDir(r.id), `${r.surface}.sh`)
   fs.writeFileSync(file, script, { mode: 0o755 })
   return file
 }
@@ -930,15 +988,15 @@ ${exec}
 function launch(args) {
   const { pos, opt } = parseArgs(args, ['ignore-lock', 'keep-orca-cli'])
   const label = pos[0]
-  if (!label || !/^[A-Za-z0-9-]+$/.test(label)) die('vp launch <label> --agent claude|codex|grok [--surface terminal|chat|plain] --prompt "<text>"')
+  if (!label || !/^[A-Za-z0-9-]+$/.test(label)) die('vp launch <label> --agent claude|codex|grok [--surface terminal|chat|plain|headless] --prompt "<text>"')
   const agent = opt.agent
   // Terminal by default: a terminal can be closed from the CLI, a chat cannot.
   const surface = opt.surface || 'terminal'
   if (!DEFAULTS[agent]) die('--agent is claude, codex, or grok')
-  if (!['chat', 'terminal', 'plain'].includes(surface)) die('--surface is chat, terminal, or plain')
-  if (opt.effort && opt.effort !== 'default' && opt.model === 'default') die('Orca takes --effort only with --model')
+  if (!['chat', 'terminal', 'plain', 'headless'].includes(surface)) die('--surface is chat, terminal, plain, or headless')
+  if (ORCA_FREE[surface] && !ORCA_FREE[surface][agent]) die(`no ${surface} recipe for ${agent}. ${surface} runs claude or codex`)
+  if (!ORCA_FREE[surface] && opt.effort && opt.effort !== 'default' && opt.model === 'default') die('Orca takes --effort only with --model')
   if (agent === 'grok' && (opt.model || opt.effort)) die('Orca refuses --model and --effort for grok. Launch without them and read the model from the record')
-  if (surface === 'plain' && agent === 'grok') die('no plain recipe for grok yet')
   if (opt['keep-orca-cli'] && surface !== 'plain') die('--keep-orca-cli is for --surface plain')
   if (!opt.prompt) die('--prompt is required')
   const me = owner()
@@ -977,9 +1035,26 @@ function launch(args) {
     fs.cpSync(SELECT_MODEL, path.join(runDir(id), 'real-select-model-backup'), { recursive: true, verbatimSymlinks: true })
     console.log(`copied the real select-model to ${path.join(runDir(id), 'real-select-model-backup')} before this fake-home run`)
   }
-  if (surface === 'plain') {
-    const script = plainScript(r, prompt)
-    const res = orca(['terminal', 'create', '--worktree', `path:${TESTBED}`, '--title', `vp-${id}`, '--command', `bash '${script}'`])
+  if (surface === 'headless') {
+    const script = orcaFreeScript(r, prompt)
+    const log = fs.openSync(path.join(runDir(id), 'headless.log'), 'a')
+    const shell = loginShell()
+    const env = { HOME: os.homedir(), USER: os.userInfo().username, LOGNAME: os.userInfo().username, SHELL: shell, TERM: 'dumb', PATH: '/usr/bin:/bin:/usr/sbin:/sbin' }
+    for (const k of ['LANG', 'TMPDIR']) if (process.env[k]) env[k] = process.env[k]
+    // A login, interactive shell reads the user's profile and rc files, as a terminal the user opens would.
+    const child = spawn(shell, ['-lic', `exec bash ${shq(script)}`], { detached: true, stdio: ['ignore', log, log], env })
+    child.unref()
+    fs.closeSync(log)
+    r.kind = 'headless'
+    r.pid = child.pid ?? null
+    const started = r.pid ? pidStart(r.pid) : null
+    r.pid_start = started?.state === 'running' ? started.start : null
+    if (r.pid && !r.pid_start) console.log(`could not read the start time of process ${r.pid} (${started.why ?? started.state}). wait and cleanup cannot tell it is the run's`)
+    r.handle = r.pid ? `pid:${r.pid}` : null
+    r.launch = { script, log: path.join(runDir(id), 'headless.log') }
+  } else if (surface === 'plain') {
+    const script = orcaFreeScript(r, prompt)
+    const res = orca(['terminal', 'create', '--worktree', `path:${TESTBED}`, '--title', `vp-${id}`, '--command', `bash ${shq(script)}`])
     r.launch = res.data ?? res.raw
     r.handle = res.result?.terminal?.handle ?? null
     r.kind = 'terminal'
@@ -1000,15 +1075,33 @@ function launch(args) {
   console.log(`run ${id}: ${agent} ${surface} ${r.model ?? ''} ${r.effort ?? ''}, handle ${r.handle}${r.prompt_outcome ? `, prompt ${r.prompt_outcome}` : ''}`)
   if (surface === 'chat' && r.kind !== 'structured') console.log(`Orca opened a ${r.kind} instead of a chat: ${receiptDetail(r.launch)}`)
   console.log(`select-model at launch: ${r.before.select_model.kind}. Evidence: ${runDir(id)}`)
-  if (surface === 'plain') console.log(`next: vp screen ${id} (answer the trust or bypass prompt with vp key), then vp wait ${id}`)
+  if (surface === 'headless') console.log(`log: ${r.launch.log}. next: vp wait ${id}`)
+  else if (surface === 'plain') console.log(`next: vp screen ${id} (answer the trust or bypass prompt with vp key), then vp wait ${id}`)
   else console.log(`next: vp wait ${id}`)
 }
 
 const receiptDetail = (launchData) => oneLine(launchData?.result?.receipt?.detail ?? JSON.stringify(launchData), 200)
 
+// A headless run's login shell can set CLAUDE_CONFIG_DIR or CODEX_HOME to a folder vp's environment does not name.
+// Its script writes the values it starts the agent with to headless-env as NUL-ended NAME=value fields, since a path
+// can hold any byte but NUL. An unset value is written empty.
+function runHomes(r) {
+  const p = path.join(runDir(r.id), 'headless-env')
+  if (r.surface !== 'headless' || !exists(p)) return []
+  const name = r.agent === 'claude' ? 'CLAUDE_CONFIG_DIR' : 'CODEX_HOME'
+  const fields = fs.readFileSync(p, 'utf8').split('\0')
+  const field = fields.find((f) => f.startsWith(`${name}=`))
+  if (fields.pop() !== '' || !field) {
+    console.log(`could not read ${name} from ${p}, so vp searches only its usual folders for the record`)
+    return []
+  }
+  const v = field.slice(name.length + 1)
+  return v ? [path.resolve(r.testbed, v)] : []
+}
+
 function locate(r) {
   if (r.record && exists(r.record)) return r.record
-  const found = findRecord(r.agent, TESTBED, r.marker, Date.parse(r.started_at) - 5000)
+  const found = findRecord(r.agent, TESTBED, r.marker, Date.parse(r.started_at) - 5000, runHomes(r))
   if (found) {
     r.record = found
     saveRun(r)
@@ -1019,6 +1112,19 @@ function locate(r) {
 const runKind = (r) => r.kind ?? (r.surface === 'chat' ? 'structured' : 'terminal')
 // Claude Code asks "Do you want to proceed?" with a "don't ask again" option. Codex asks "Would you like to run the following command?".
 const PERMISSION_PROMPT = /Do you want to (proceed|make this edit|create)|don't ask again|Would you like to run|Allow command\?|approve this/i
+
+const alive = (pid) => {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (e) {
+    return e.code === 'EPERM'
+  }
+}
+const logTail = (r, n = 20) => {
+  const p = path.join(runDir(r.id), 'headless.log')
+  return exists(p) ? fs.readFileSync(p, 'utf8').split('\n').filter((l) => l.trim()).slice(-n).join('\n') : `(no ${p})`
+}
 
 function screenTail(r) {
   const res = orca(['terminal', 'read', '--terminal', r.handle])
@@ -1032,9 +1138,23 @@ function wait(args) {
   const quiet = Number(opt.quiet ?? 20) * 1000
   const t0 = Date.now()
   let lastReport = 0
+  let psNote = null
+  const progressNote = () => {
+    const n = psNote || ''
+    if (psNote) psNote = ''
+    return n
+  }
   for (;;) {
+    // Read before locating, so a record written just before the exit is still found.
+    const leader = runKind(r) === 'headless' ? runLeader(r) : null
+    const exited = leader?.state === 'gone'
+    if (leader?.state === 'unknown' && psNote === null) psNote = `. ps cannot tell whether the run's process still runs (${leader.why}), so vp keeps waiting`
     const file = locate(r)
     const elapsed = Math.round((Date.now() - t0) / 1000)
+    if (!file && exited) {
+      console.log(`run ${r.id}: the process exited (${leader.why}) and no record carries ${r.marker}. Last lines of headless.log:\n${logTail(r)}`)
+      process.exit(1)
+    }
     if (file) {
       const rec = parseRecord(r.agent, file)
       const probe = r.agent === 'grok' ? path.join(file, 'chat_history.jsonl') : file
@@ -1043,9 +1163,13 @@ function wait(args) {
         console.log(`run ${r.id} is waiting on a question after ${rec.calls.length} tool calls. Read it with vp read ${r.id}`)
         process.exit(3)
       }
-      if (rec.done && idle >= quiet) {
+      if (rec.done && (idle >= quiet || exited)) {
         console.log(`run ${r.id} finished: ${rec.calls.length} tool calls. Next: vp read ${r.id}`)
         return
+      }
+      if (exited) {
+        console.log(`run ${r.id}: the process exited (${leader.why}) before its record showed the turn ended. Last lines of headless.log:\n${logTail(r)}`)
+        process.exit(1)
       }
       const pending = rec.calls.filter((c) => c.result === undefined)
       if (!rec.done && pending.length && idle >= quiet && runKind(r) === 'terminal') {
@@ -1057,11 +1181,11 @@ function wait(args) {
       }
       if (Date.now() - lastReport > 30000) {
         const last = rec.calls.at(-1)
-        console.log(`[${elapsed}s] ${rec.calls.length} tool calls${last ? `, last ${last.name} ${shown(last, 90)}` : ''}`)
+        console.log(`[${elapsed}s] ${rec.calls.length} tool calls${last ? `, last ${last.name} ${shown(last, 90)}` : ''}${progressNote()}`)
         lastReport = Date.now()
       }
     } else if (Date.now() - lastReport > 30000) {
-      console.log(`[${elapsed}s] no record with ${r.marker} yet${elapsed > 90 ? `. Check the agent: vp screen ${r.id}` : ''}`)
+      console.log(`[${elapsed}s] no record with ${r.marker} yet${elapsed > 90 ? `. Check the agent: vp screen ${r.id}` : ''}${progressNote()}`)
       lastReport = Date.now()
     }
     if (Date.now() - t0 > timeout) {
@@ -1115,7 +1239,11 @@ function read(args) {
 
 function screen(args) {
   const r = loadRun(args[0])
-  if ((r.kind ?? (r.surface === 'chat' ? 'structured' : 'terminal')) !== 'terminal') die('a chat has no terminal screen. Use vp read')
+  if (runKind(r) === 'headless') {
+    const leader = runLeader(r)
+    return console.log(`${logTail(r, 40)}\n(process ${r.pid} ${leader.state === 'running' ? 'running' : leader.state === 'gone' ? `exited: ${leader.why}` : `unknown: ${leader.why}`})`)
+  }
+  if (runKind(r) !== 'terminal') die('a chat has no terminal screen. Use vp read')
   const res = orca(['terminal', 'read', '--terminal', r.handle])
   if (!res.ok) die(oneLine(res.raw.stderr || res.raw.stdout, 300))
   console.log((res.result?.terminal?.tail || []).filter((l) => l.trim()).join('\n'))
@@ -1123,6 +1251,7 @@ function screen(args) {
 
 function key(args) {
   const r = loadRun(args[0])
+  if (runKind(r) !== 'terminal') die(`a ${runKind(r)} run takes no input`)
   const what = args.slice(1).join(' ')
   const keys = { down: '\u001b[B', up: '\u001b[A' }
   const a = ['terminal', 'send', '--terminal', r.handle]
@@ -1180,14 +1309,46 @@ function closeRunTerminals(r) {
   return { ok: true, note: `terminal: ${notes.join('; ')}. No longer listed in the testbed` }
 }
 
+// detached made the agent the leader of its own process group, so -pid reaches whatever it started too.
+// Never signal without a pid: -0 is vp's own process group. A recorded pid can belong to another process once
+// the run's has exited, so signal a live leader only when its start time is the one recorded at launch. A group
+// whose leader is gone keeps its id while it has members, and no new process can take that id, so it is still the run's.
+// When ps cannot answer, vp cannot tell those apart, so it signals nothing.
+function stopGroup(r) {
+  if (!r.pid) return { note: 'headless run has no pid recorded, nothing to stop' }
+  if (r.cleaned_at) return { note: `process group ${r.pid}: run already cleaned at ${r.cleaned_at}, nothing signalled` }
+  if (!alive(-r.pid)) return { note: `process group ${r.pid}: already exited` }
+  const leader = runLeader(r)
+  if (leader.state === 'unknown')
+    return {
+      unknown: true,
+      note: `process group ${r.pid}: still has members, but whether its leader is the run's is unknown (${leader.why}). Nothing signalled. Rerun vp cleanup when ps can tell, or once the group has exited`,
+    }
+  if (leader.reused) return { note: `process group ${r.pid}: ${leader.why}, so the pid belongs to another process now. Nothing signalled` }
+  const errors = []
+  const signal = (sig) => {
+    try {
+      process.kill(-r.pid, sig)
+    } catch (e) {
+      if (e.code !== 'ESRCH') errors.push(`${sig} failed: ${e.message}`)
+    }
+  }
+  signal('SIGTERM')
+  sleep(2000)
+  if (alive(-r.pid)) signal('SIGKILL')
+  return { note: `process group ${r.pid}: was still running, stopped${errors.length ? `, ${errors.join(', ')}` : ''}${alive(-r.pid) ? ', BUT IT IS STILL ALIVE' : ''}` }
+}
+
 function cleanup(args) {
   const { pos, opt } = parseArgs(args, ['revert', 'tmp'])
   const r = loadRun(pos[0])
   const dir = runDir(r.id)
   const since = Date.parse(r.started_at) - 5000
   const log = []
-  const kind = r.kind ?? (r.surface === 'chat' ? 'structured' : 'terminal')
-  if (r.handle && kind === 'terminal') {
+  const kind = runKind(r)
+  const stop = kind === 'headless' ? stopGroup(r) : null
+  if (stop) log.push(stop.note)
+  else if (r.handle && kind === 'terminal') {
     const res = closeRunTerminals(r)
     log.push(res.note)
     r.closed = res.ok
@@ -1200,13 +1361,20 @@ function cleanup(args) {
       const res = orca(['orchestration', 'worker-stop', '--dispatch', w.id])
       log.push(`worker ${w.id} (${w.state}/${w.stage}): ${res.ok ? 'stopped' : `stop failed ${oneLine(res.raw.stderr || res.raw.stdout, 200)}`}`)
     }
-  if (r.fakehome && exists(r.fakehome)) {
+  const held = []
+  if (stop?.unknown) {
+    if (r.fakehome && exists(r.fakehome)) held.push(`fake home ${r.fakehome}`)
+  } else if (r.fakehome && exists(r.fakehome)) {
     fs.cpSync(r.fakehome, path.join(dir, 'fakehome'), { recursive: true, verbatimSymlinks: true })
     fs.rmSync(r.fakehome, { recursive: true })
     log.push(`fake home ${r.fakehome}: copied to ${path.join(dir, 'fakehome')}, removed`)
   }
   const temps = (rec ? tmpDirs(rec, since) : []).filter((d) => !r.fakehome || path.resolve(d) !== path.resolve(r.fakehome))
   for (const d of temps) {
+    if (stop?.unknown) {
+      if (opt.tmp) held.push(`temp dir ${d}`)
+      continue
+    }
     if (!opt.tmp) {
       log.push(`temp dir ${d} was created after launch and named by the run. If it is the run's, rerun with --tmp to keep a copy and remove it`)
       continue
@@ -1220,7 +1388,8 @@ function cleanup(args) {
     const diff = sh('git', ['-C', TESTBED, 'diff']).stdout
     fs.writeFileSync(path.join(dir, 'testbed-residue.txt'), `${residue.join('\n')}\n\n${diff}`)
     log.push(`testbed residue saved to testbed-residue.txt: ${residue.join(' | ')}`)
-    if (opt.revert) {
+    if (opt.revert && stop?.unknown) held.push('the testbed revert')
+    else if (opt.revert) {
       for (const l of residue) {
         const f = l.slice(3)
         if (l.startsWith('??')) fs.rmSync(path.join(TESTBED, f), { recursive: true, force: true })
@@ -1229,11 +1398,13 @@ function cleanup(args) {
       log.push('testbed residue reverted')
     } else log.push('rerun with --revert to restore those testbed paths')
   }
+  if (held.length) log.push(`held because the run may still be running: ${held.join(', ')}. Rerun vp cleanup when ps can tell, or once the group has exited, to finish them`)
   const l = readLock()
   if (l && l.owner === r.owner && (l.placed || l.stash)) log.push('REMINDER: your select-model lock still has a sample placed or a stash pending. Run vp sm release when your last run is done')
-  r.cleaned_at = iso()
+  // A group left running because ps could not answer stays uncleaned, so a later cleanup can still stop it.
+  if (!stop?.unknown) r.cleaned_at = iso()
   saveRun(r)
-  fs.appendFileSync(path.join(dir, 'cleanup.log'), `${r.cleaned_at}\n${log.join('\n')}\n`)
+  fs.appendFileSync(path.join(dir, 'cleanup.log'), `${iso()}\n${log.join('\n')}\n`)
   console.log(log.length ? log.join('\n') : 'nothing to clean')
   console.log(`evidence kept at ${dir}: ${fs.readdirSync(dir).join(', ')}`)
 }
@@ -1269,11 +1440,13 @@ function doctor() {
   const problems = []
   const warn = []
   const ok = (m) => console.log(`ok    ${m}`)
+  // A headless run needs no Orca, so Orca not answering only narrows which runs can start, and its checks are skipped.
   const status = orca(['status'], { timeout: 20000 })
-  if (status.ok) ok(`orca reachable (${sh(ORCA, ['--version']).stdout.trim()}, snapshot ${fs.readFileSync(path.join(REPO, 'orca/VERSION'), 'utf8').trim()})`)
-  else problems.push(`orca status failed: ${oneLine(status.raw.stderr || status.raw.stdout, 200)}`)
-  const idx = orca(['search', '--index-status'], { timeout: 20000 })
-  if (idx.ok && idx.result?.enabled === false) warn.push('Orca session search is off (Settings > Agent Session History). vp finds records without it')
+  const orcaUp = status.ok
+  if (orcaUp) ok(`orca reachable (${sh(ORCA, ['--version']).stdout.trim()}, snapshot ${fs.readFileSync(path.join(REPO, 'orca/VERSION'), 'utf8').trim()})`)
+  else warn.push(`orca does not answer (${oneLine(status.raw.stderr || status.raw.stdout, 200) || `exit ${status.raw.status}`}). Only --surface headless runs can start, and the terminal and chat checks are skipped`)
+  const idx = orcaUp ? orca(['search', '--index-status'], { timeout: 20000 }) : null
+  if (idx?.ok && idx.result?.enabled === false) warn.push('Orca session search is off (Settings > Agent Session History). vp finds records without it')
   if (!exists(path.join(TESTBED, '.git'))) problems.push(`no testbed git repo at ${TESTBED}`)
   else {
     const st = testbedStatus()
@@ -1314,9 +1487,9 @@ function doctor() {
   console.log(`info  select-model: ${s.kind}${s.owner ? ` placed by ${s.owner}` : ''}. lock: ${describeLock(readLock())}`)
   if (s.kind === 'sample' && !readLock()) problems.push(`a sample select-model is installed with no lock (placed by ${s.owner}). Ask its owner or the user before removing it`)
   if (exists(STASH) && fs.readdirSync(STASH).some((n) => n.startsWith('select-model-') && !n.endsWith('.json'))) problems.push(`a real select-model is stashed under ${STASH}. Restore it (vp sm restore, or ${path.join(STASH, 'RESTORE.txt')})`)
-  const terms = testbedTerminals()
+  const terms = orcaUp ? testbedTerminals() : undefined
   if (terms === null) warn.push('could not list the testbed terminals')
-  else {
+  else if (terms) {
     // Agents retitle their tabs, so match recorded handles as well as the marker in the title.
     const runsHere = exists(EVIDENCE) ? fs.readdirSync(EVIDENCE).filter((id) => exists(path.join(EVIDENCE, id, 'run.json'))).map((id) => readJson(path.join(EVIDENCE, id, 'run.json'))) : []
     const me = identity()?.id
@@ -1333,8 +1506,8 @@ function doctor() {
     if (live.length) warn.push(`terminals still running with no tab (closed in Orca's window): ${live.map((t) => `${t.handle}${runOf(t) ? ` (run ${runOf(t).id})` : ''}`).join(', ')}. vp cleanup of the owning run ends one by typing exit into it. Leave others' to their owner`)
     if (dead.length) warn.push(`disconnected terminal records in the testbed: ${dead.map((t) => t.handle).join(', ')}. The CLI cannot remove them. The user must close them in Orca's window`)
   }
-  const ps = orca(['worktree', 'ps', '--limit', '500'])
-  const chats = (ps.result?.worktrees?.find((w) => w.path === TESTBED)?.agents ?? []).filter((a) => (a.paneKey || '').startsWith('structured-agent-session-'))
+  const ps = orcaUp ? orca(['worktree', 'ps', '--limit', '500']) : null
+  const chats = (ps?.result?.worktrees?.find((w) => w.path === TESTBED)?.agents ?? []).filter((a) => (a.paneKey || '').startsWith('structured-agent-session-'))
   if (chats.length) {
     const running = chats.filter((a) => a.state !== 'done').length
     warn.push(`${chats.length} chat sessions are open in the testbed (${running} not done). No CLI command closes a chat. The user must close them in Orca's window`)
@@ -1365,12 +1538,13 @@ const HELP = `vp.mjs: drive pstack skills in real agent sessions (see ../SKILL.m
   sm status|lock "<purpose>"|place [--from <dir>]|remove|stash --approved "<words>"|restore|release|break --approved "<words>"
                                   the shared ~/.agents/skills/select-model and its lock
   fakehome <name> [--sample] [--from <dir>]   a throwaway home under /tmp for generator runs
-  launch <label> --agent claude|codex|grok [--surface terminal|chat|plain] --prompt "<text>"
+  launch <label> --agent claude|codex|grok [--surface terminal|chat|plain|headless] --prompt "<text>"
          [--model <id>|default] [--effort <level>|default] [--fakehome <dir>] [--ignore-lock] [--keep-orca-cli]
-  wait <run> [--timeout 240] [--quiet 20]    exit 0 finished, 2 still running, 3 asking a question, 4 at a permission prompt
+  wait <run> [--timeout 240] [--quiet 20]    exit 0 finished, 1 headless process ended unfinished, 2 still running, 3 asking a question, 4 at a permission prompt
   read <run> [--width 160] | read --record <file> [--agent claude|codex|grok]
-  screen <run> | key <run> down|up|enter|"<text>"   terminal and plain runs only
-  cleanup <run> [--tmp] [--revert]   close the run's terminal tab and what it started; evidence stays
+  screen <run>                    a terminal or plain run's screen, or the tail of a headless run's log
+  key <run> down|up|enter|"<text>"   terminal and plain runs only
+  cleanup <run> [--tmp] [--revert]   close the run's terminal tab or stop its headless process group, and what it started; evidence stays
   runs                            list runs under ${EVIDENCE}
   whoami                          the owner name vp uses here, and how other sessions reach you
 

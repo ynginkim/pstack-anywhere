@@ -10,10 +10,11 @@ This repo started as a mirror of Cursor's pstack and is now a fork whose skills,
 
 Never copy Cursor's files or an Orca snapshot onto `main` directly. That erases the edits.
 
-Four checks guard `main` (`.github/workflows/check.yml`):
+Five checks guard `main` (`.github/workflows/check.yml`):
 
 - `node scripts/check-orca-commands.mjs` fails when a doc or skill on `main` names an `orca` command or flag that `orca/agent-context.json` does not have.
 - `node scripts/lint-rewritten.mjs` fails when Cursor wording or a product name comes back into a rewritten skill or playbook.
+- `node scripts/check-ownership.mjs` fails when a product's name or tool appears outside its own adapter under `skills/resolve-capability/adapters/`, or when an adapter breaks the contract's shape.
 - `node scripts/prune-cursor-deps.mjs --check` fails when `CURSOR-DEPENDENCIES.md` keeps a row for a rewritten path or its counts are stale.
 - The bundled scripts' tests (`bun run test` in `skills/poteto-mode/scripts`).
 

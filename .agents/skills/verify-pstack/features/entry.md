@@ -32,9 +32,11 @@ Preconditions:
 - **Codex.** Run `$VP launch E --agent codex --prompt '$poteto-mode calc.js의 sum()이 마지막 원소를 빼먹는지 조사해줘. 이번은 진입 확인용이다. 선택한 playbook의 단계를 todo(todo 도구가 없으면 답변 목록)로 옮기는 데까지만 하고 멈춰라. 조사·subagent·worker는 시작하지 마.'`. The todo list comes from `update_plan`. Close it with `$VP cleanup <run id>`.
 - **Grok.** Run the Claude prompt with `--agent grok` and no model or effort. The first run in a folder stops at Grok's trust screen. Answer it as `../SKILL.md` (Launch) says. The todo list comes from Grok's `todo_write`.
 - **No Orca.** Run the Claude prompt with `--surface plain`, answer the first screen as `../SKILL.md` says, then wait and read. The criteria are the same.
+- **Headless.** Run the Claude prompt and the Codex prompt with `--surface headless`. No Orca starts them, and nothing can answer them mid-run. The criteria are the same.
 
 ## Gotchas
 
+- With `--surface headless` on 2026-11-10, H4-entry-codex-114518 passed, and H4-entry-claude-114518 failed only `entry-copy`, because it translated the steps into Korean. Both ran `detect.sh` first and read their own harness adapter, and both logs showed no Orca and no calling-session variables.
 - Earlier passes: E1 (Claude chat), E2 (Claude terminal), E3 (no Orca), E4 (Codex terminal). They ran before `select-model` existed.
 - Final pass before release: F1-entry-171628 (Claude terminal) and F2-entry-171630 (Codex terminal) both passed. Neither build offered a todo tool (Claude Code 2.1.309 showed no `TodoWrite`, and that Codex build's instructions had no `update_plan`), so both kept the list in the reply, which the criterion allows.
 - G-entry-131737 (Grok terminal, 2026-10-27) passed. It copied the four steps verbatim with `todo_write`, and read only the playbook, neither `select-model` nor `resolve-capability`.

@@ -63,7 +63,7 @@ Two special cases have their own generators. A skill that must drive your app an
 
 ## Capability names
 
-Open a pstack skill and you will see names in backticks, such as `spawn-worker`, `wake-on-event`, or `use-forge`. They are capabilities, not commands. A step names what it needs from your environment and leaves the tool out, because the tool differs between Claude Code, Codex, Grok, and Orca. [`resolve-capability`](../../skills/resolve-capability/SKILL.md) says which tool does each one in each environment, and what to do when none can. The model reads it at the start of a task, and it asks whether Orca is here as its own question.
+Open a pstack skill and you will see names in backticks, such as `spawn-worker`, `wake-on-event`, or `use-forge`. They are capabilities, not commands. A step names what it needs from your environment and leaves the tool out, because the tool differs between Claude Code, Codex, Grok, and Orca. [`resolve-capability`](../../skills/resolve-capability/SKILL.md) is the contract: what each one means and what to do when nothing provides it. Each product has an adapter in its `adapters/` folder that says which tool does each capability there. At the start of every task the model runs `detect.sh`, which names the environments that are here, then reads the contract, those environments' adapters, and its own harness's adapter.
 
 There are 21, in groups:
 
@@ -76,7 +76,7 @@ There are 21, in groups:
 
 Each capability has one of four states in a given environment. The harness does it with its own tool, it needs a product that may be missing (Orca, `gh`), you do it by hand with the shell, or the step is skipped and the reply says so in one line. Starting another vendor's agent is a good example. Any session with a shell can start Codex, Claude, or Grok without its interface. Orca adds supervision, an inbox, and a run that survives a restart.
 
-When you write your own skill, name a capability and read `resolve-capability` instead of naming a tool. The list is closed. A new need goes into the adapter first, in a pull request to pstack, because the adapter ships with the skills. `select-model` records the facts about your computer and is the place for those, not a skill.
+When you write your own skill, name a capability and read `resolve-capability` instead of naming a tool. The list is closed. A new need goes into the contract first, with a fallback, and then into each adapter that can do it, in a pull request to pstack, because the adapters ship with the skills. A new harness or environment is a new folder under `adapters/`. `select-model` records the facts about your computer and is the place for those, not a skill.
 
 ## Write docs to a standard with `/technical-writing`
 
