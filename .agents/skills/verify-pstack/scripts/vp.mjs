@@ -904,6 +904,9 @@ const ORCA_FREE = {
   },
 }
 
+// Variables a calling agent session exports, which a user's own shell does not have. CLAUDE_CONFIG_DIR and CODEX_HOME are the user's settings and stay.
+const PARENT_SESSION_VARS = '^(CLAUDECODE|CLAUDE_CODE_|CLAUDE_AGENT_SDK_|CODEX_SANDBOX|CODEX_THREAD_ID)'
+
 // A script that starts the agent the way a shell Orca did not open would, and refuses to start it if any trace of Orca is left.
 function orcaFreeScript(r, prompt) {
   const promptFile = path.join(runDir(r.id), 'prompt.txt')
@@ -925,17 +928,20 @@ for d in "\${DIRS[@]}"; do
 done
 export PATH="$NEW"
 `
+  const headless = r.surface === 'headless'
+  const clearParent = headless ? `unset $(compgen -e | grep -E '${PARENT_SESSION_VARS}')\n` : ''
+  const parentLeft = headless ? `parent=$(compgen -e | grep -cE '${PARENT_SESSION_VARS}')\n` : ''
   const script = `#!/bin/bash
 # Starts ${r.agent} ${r.surface} with no ORCA_* variables${r.keep_orca_cli ? '' : ' and no orca binary on PATH'}.
 unset $(compgen -e | grep '^ORCA_')
-${stripPath}cd '${r.testbed}' || exit 1
+${clearParent}${stripPath}cd '${r.testbed}' || exit 1
 left=$(compgen -e | grep -c '^ORCA_')
-on=$(command -v orca || echo none)
-if [ "$left" != 0 ]${r.keep_orca_cli ? '' : ' || [ "$on" != none ]'}; then
-  echo "vp: ORCA vars left $left, orca on PATH: $on"
+${parentLeft}on=$(command -v orca || echo none)
+if [ "$left" != 0 ]${headless ? ' || [ "$parent" != 0 ]' : ''}${r.keep_orca_cli ? '' : ' || [ "$on" != none ]'}; then
+  echo "vp: ORCA vars left $left${headless ? ', parent-session vars left $parent' : ''}, orca on PATH: $on"
   exit 1
 fi
-echo "vp ${r.surface}: ORCA vars left $left, orca on PATH: $on"
+echo "vp ${r.surface}: ORCA vars left $left${headless ? ', parent-session vars left $parent' : ''}, orca on PATH: $on"
 ${exec}
 `
   const file = path.join(runDir(r.id), `${r.surface}.sh`)
