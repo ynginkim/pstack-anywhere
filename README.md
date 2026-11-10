@@ -109,7 +109,7 @@ For work that runs for hours, give the run a loop or a schedule: `/loop` in Clau
 
 ## Skills
 
-[`/poteto-mode`](./skills/poteto-mode/SKILL.md) runs most of these for you when a step needs them (`how`, `why`, `architect`, `arena`, `swarm`, `interrogate`, `unslop`, `no-comments`, `technical-writing`, `tdd`, and the principles). The table below is for when you want one directly:
+[`/poteto-mode`](./skills/poteto-mode/SKILL.md) runs most of these for you when a step needs them (`how`, `why`, `architect`, `arena`, `swarm`, `interrogate`, `unslop`, `deslop`, `no-comments`, `control-ui`, `control-cli`, `technical-writing`, `tdd`, and the principles). The table below is for when you want one directly:
 
 ```
 /how do we cancel runs? do we have an n+1 when we look up every run to cancel?
@@ -147,10 +147,13 @@ For work that runs for hours, give the run a loop or a schedule: `/loop` in Clau
 | [`/teach`](./skills/teach/SKILL.md) | you want to actually understand a change or subsystem, not just have it summarized. runs how + why and weaves one plain explanation, built up diagram by diagram. |
 | [`/tdd`](./skills/tdd/SKILL.md) | you're fixing a bug and there's a cheap local test path. write the failing test first, then the fix. |
 | [`/benchmark-checklist`](./skills/benchmark-checklist/SKILL.md) | you ran a benchmark or measured a speedup or regression. vets the number (limiter, tuning, errors, repeat runs, end-to-end relevance) before you report or act on it. |
+| [`/deslop`](./skills/deslop/SKILL.md) | before commit. removes code slop the branch added: defensive checks a trusted path doesn't need, casts that dodge the type system, deep nesting, code that doesn't match its file. leaves comments to `/no-comments`. |
 | [`/no-comments`](./skills/no-comments/SKILL.md) | strip comments before review; spawns Comment Sicko, fixes accepted findings, offers encodings for claimed constraints. |
 | [`/typescript-best-practices`](./skills/typescript-best-practices/SKILL.md) | you're reading or editing typescript. grounds the type-system-discipline principle in syntax. |
 | [`/figure-it-out`](./skills/figure-it-out/SKILL.md) | no bundled playbook fits. designs a rigorous, auditable playbook for the task. |
 | [`/show-me-your-work`](./skills/show-me-your-work/SKILL.md) | you want a reviewable decision trail. logs decisions to a tsv you can commit. |
+| [`/control-ui`](./skills/control-ui/SKILL.md) | you want a web, ide, or electron ui driven for real and checked with screenshots, snapshots, or profiles. uses your harness's browser tool, or builds a temporary playwright or devtools-protocol harness. |
+| [`/control-cli`](./skills/control-cli/SKILL.md) | you want a cli or tui driven for real with fixed input and checked with transcripts or profiles. uses your harness's terminal tool, or builds a temporary tmux or pty harness. |
 | [`/create-verification-skill`](./skills/create-verification-skill/SKILL.md) | your project has no scripted way to prove app behavior. generates a project-local verify skill with a feature map, for any language or platform. |
 | [`/maintain-verification-skill`](./skills/maintain-verification-skill/SKILL.md) | your verify skill's feature map has drifted from the app. source wave + one live pass, at most one PR of proven corrections. |
 | [`/create-formal-verification-skill`](./skills/create-formal-verification-skill/SKILL.md) | tests can't reach the case that breaks a race, retry, state machine, parser, or unsafe code. verifies one property with the tool that fits and generates a project-local skill to recheck it on every change. |
@@ -254,8 +257,7 @@ Twenty-four short skills, one principle each. `poteto-mode` indexes them inline 
 
 ## Not shipped here
 
-- There is no `/deslop`. [`/unslop`](./skills/unslop/SKILL.md) and [`/no-comments`](./skills/no-comments/SKILL.md) cover cleaning prose and comments.
-- There is no skill that drives a browser, a desktop window, or a terminal program. The `drive-app` capability in [`resolve-capability`](./skills/resolve-capability/SKILL.md) says how each environment does it.
+- There is no skill that drives a native desktop window. The `drive-app` capability in [`resolve-capability`](./skills/resolve-capability/SKILL.md) says how each environment does it.
 - Skill authoring and `/loop` come from your harness. The [authoring playbook](./skills/poteto-mode/playbooks/authoring-a-skill.md) covers the rest.
 
 ## Why are there no planning skills?
@@ -281,4 +283,4 @@ PRs are welcome. Before you open one:
 
 ## License
 
-MIT
+MIT. [`/deslop`](./skills/deslop/SKILL.md), [`/control-ui`](./skills/control-ui/SKILL.md), and [`/control-cli`](./skills/control-cli/SKILL.md) are adapted from Cursor's [`cursor-team-kit`](https://github.com/cursor/plugins/tree/main/cursor-team-kit), which is MIT-licensed by Cursor. Each of those skill folders carries its `LICENSE`.
