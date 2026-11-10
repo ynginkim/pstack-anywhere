@@ -72,7 +72,7 @@ There are 21, in groups:
 - **Talking to you.** `ask-user` is a question with options, only for a call you must make. `track-todos` is a visible plan with step status.
 - **Code hosting.** `use-forge` creates, reviews, and merges pull requests. `read-review-bot` reads automated review threads and check runs.
 - **Files, skills, and sessions.** `run-skill` runs another pstack skill. `author-skill` writes a new one. `find-sessions` finds this workspace's past and running sessions. `locate` says where instructions, skills, and worktrees live. `durable-store` is a place that outlives a restart.
-- **Driving and inspecting.** `list-mcp-servers` shows which MCP servers the session has. `drive-app` drives a browser, a terminal program, or a window and captures evidence. `inspect-runtime` attaches to a live process for a profile or a heap snapshot.
+- **Driving and inspecting.** `list-mcp-servers` shows which MCP servers the session has. `drive-app` drives a browser, a terminal program, or a window and captures evidence, and the `/control-ui` and `/control-cli` skills say how to drive one step at a time. `inspect-runtime` attaches to a live process for a profile or a heap snapshot.
 
 Each capability has one of four states in a given environment. The harness does it with its own tool, it needs a product that may be missing (Orca, `gh`), you do it by hand with the shell, or the step is skipped and the reply says so in one line. Starting another vendor's agent is a good example. Any session with a shell can start Codex, Claude, or Grok without its interface. Orca adds supervision, an inbox, and a run that survives a restart.
 

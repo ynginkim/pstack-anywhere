@@ -18,8 +18,8 @@ Now the agent has three checks it can run, not a mood to satisfy. When the reply
 
 Match the check to the change:
 
-- A CLI change runs the real command.
-- A UI change walks the changed flow in the running app. When it must match a reference pixel for pixel, the [Visual parity playbook](../../skills/poteto-mode/playbooks/visual-parity.md) diffs screenshots against a frozen baseline instead of judging by eye.
+- A CLI change runs the real command. [`/control-cli`](../../skills/control-cli/SKILL.md) drives an interactive one with fixed input and keeps the transcript.
+- A UI change walks the changed flow in the running app. [`/control-ui`](../../skills/control-ui/SKILL.md) drives it one action at a time and keeps the screenshots. When it must match a reference pixel for pixel, the [Visual parity playbook](../../skills/poteto-mode/playbooks/visual-parity.md) diffs screenshots against a frozen baseline instead of judging by eye.
 - A parser or migration replays a saved input.
 - A perf change compares before and after profiles.
 - A storage change reads back the written value.

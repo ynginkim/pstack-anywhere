@@ -4,7 +4,7 @@ This repo started as a mirror of Cursor's pstack and is now a fork whose skills,
 
 | Branch | Holds | Who updates it |
 | --- | --- | --- |
-| `upstream` | [`cursor/plugins/pstack`](https://github.com/cursor/plugins/tree/main/pstack), byte for byte | `scripts/sync-upstream.sh`, weekly in CI |
+| `upstream` | [`cursor/plugins/pstack`](https://github.com/cursor/plugins/tree/main/pstack), byte for byte, and under `cursor-team-kit/` the team-kit files this fork bundles | `scripts/sync-upstream.sh`, weekly in CI |
 | `upstream-orca` | `orca/`: the skill guides and command schema shipped inside the `orca` binary | `scripts/sync-orca.sh`, on a machine with Orca installed |
 | `main` | this fork | commits and reviewed pull requests |
 
@@ -22,7 +22,7 @@ Five checks guard `main` (`.github/workflows/check.yml`):
 
 ## Cursor upstream
 
-CI (`.github/workflows/sync-upstream.yml`) runs every Monday. When Cursor changed pstack, it commits the new files to `upstream`, pushes that branch, and opens an issue labeled `upstream`. The issue lists each changed file and says whether this fork rewrote it by hand. Nothing is merged. To run it by hand:
+CI (`.github/workflows/sync-upstream.yml`) runs every Monday. When Cursor changed pstack or a bundled team-kit file, it commits the new files to `upstream`, pushes that branch, and opens an issue labeled `upstream`. The issue lists each changed file and says whether this fork rewrote it by hand. Nothing is merged. To run it by hand:
 
 ```bash
 scripts/sync-upstream.sh                          # prints the new upstream commit, or nothing
@@ -35,6 +35,16 @@ To act on an issue:
 1. A file under a path in `scripts/rewritten.json` was rewritten here. Read the change on `upstream` (`git diff <old> upstream -- <file>`), decide whether it still applies, and carry its meaning into the rewritten file in capability names. Do not merge the upstream file over it.
 2. A file that was not rewritten is new or untouched here. Decide whether to bring it in. If you do, rewrite it in capability names first (the rules are in [`docs/decursor-progress.md`](./docs/decursor-progress.md)), add its path to `scripts/rewritten.json`, and run `node scripts/prune-cursor-deps.mjs`.
 3. Close the issue with what you ported and what you left.
+
+### The team kit
+
+Three skills come from Cursor's [`cursor-team-kit`](https://github.com/cursor/plugins/tree/main/cursor-team-kit), not from pstack: `deslop`, `control-ui`, and `control-cli`. Upstream pstack calls them, so this fork bundles them, rewritten in capability names like every other skill. They were adapted from `cursor/plugins` at `de8ee15` (2026-11-09).
+
+The team kit is MIT-licensed by Cursor, separately from pstack. Each bundled skill folder carries a copy of the team kit's `LICENSE`, because the `skills` CLI installs one folder at a time and the notice has to travel with it.
+
+`scripts/sync-upstream.sh` copies only these paths, plus the `LICENSE`, into `cursor-team-kit/` on the `upstream` branch. The list is the `team_kit` array at the top of the script. The weekly issue files them under "Rewritten here", and `cursor-team-kit/skills/<name>/` maps to `skills/<name>/` here. Port a change the same way as a pstack change. When the `LICENSE` changes, copy it into each bundled skill folder unchanged.
+
+To bundle another team-kit skill, rewrite it under `skills/<name>/` with the `LICENSE` copy, add `skills/<name>/` to `scripts/rewritten.json`, and add `skills/<name>` to `team_kit`. The other team-kit skills (`fix-ci`, `loop-on-ci`, `verify-this`, and the rest) are not tracked, because pstack does not call them.
 
 ## Orca upstream
 

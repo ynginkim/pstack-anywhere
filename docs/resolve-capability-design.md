@@ -92,7 +92,7 @@ Two consequences from the review of the playbooks:
 - The `orch` store's units, inbox, and gates duplicate what Orca does, so under Orca a step uses `coordinate-workers`. The verification ledger has no Orca equivalent and stays on `orch` everywhere.
 - Reading a PR until it reaches a terminal verdict is `watch-pr` plus `wake-on-event`. It is not a capability of its own.
 
-`deslop` is not shipped by pstack and is not a capability. Steps that name it use the bundled `unslop` and `no-comments` skills through `run-skill`.
+`deslop` is not a capability. pstack bundles it as a skill adapted from the Cursor team kit (added after this design), and steps run it through `run-skill`. The team kit's `control-ui` and `control-cli` are bundled the same way, and they drive through `drive-app`.
 
 The Cursor-internal forge (`origin pr ...`) is dropped from every playbook and script. Steps use `gh`. The playbooks' ban on `gt` stays.
 

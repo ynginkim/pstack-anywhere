@@ -74,7 +74,7 @@ Each capability in the index has a scope. The scope says whose mechanism answers
 **Driving and inspecting**
 
 - `list-mcp-servers` (own harness): which MCP servers this session has. Your tool list shows the tools they provide. A worker has only its own agent's servers, not yours, so for a worker read the target product's adapter. Fallback: say which servers you could not see.
-- `drive-app` (own harness): drive a browser, a terminal program, or a desktop window, and capture evidence. Fallback: a browser MCP or Playwright, or the shell, and screenshots. For a recording on macOS, `screencapture -v -V <seconds> <file>.mov` recorded a clip here (it films the whole screen, so tell the user and keep the file out of the repository). Playwright's video option is another way (unverified).
+- `drive-app` (own harness): drive a browser, a terminal program, or a desktop window, and capture evidence. How to drive one step at a time and what to capture is in the bundled **control-ui** skill (browser, Electron, and web UIs) and **control-cli** skill (CLIs and TUIs). Fallback: a browser MCP, or the temporary harness those skills build (Playwright or the DevTools protocol, `tmux` or a PTY script), and screenshots. For a recording on macOS, `screencapture -v -V <seconds> <file>.mov` recorded a clip here (it films the whole screen, so tell the user and keep the file out of the repository). Playwright's video option is another way (unverified).
 - `inspect-runtime` (contract): attach to a live process for CDP, a CPU profile, a heap snapshot, or code evaluated in it. The Node inspector or the Chrome DevTools protocol through the shell (unverified). Fallback: say which attach method was missing.
 
 ## 4. Bundled tools are not capabilities

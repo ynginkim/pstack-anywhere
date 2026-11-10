@@ -30,7 +30,7 @@ jobs:
         run: |
           git push origin upstream
           node scripts/upstream-report.mjs "${{ steps.before.outputs.sha }}" upstream > report.md
-          gh label create upstream --description "Cursor changed pstack" --color 1d76db 2>/dev/null || true
+          gh label create upstream --description "Cursor changed pstack or the team kit" --color 1d76db 2>/dev/null || true
           gh issue create --label upstream \
-            --title "Cursor changed pstack: ${{ steps.sync.outputs.commit }}" \
+            --title "Cursor changed pstack or the team kit: ${{ steps.sync.outputs.commit }}" \
             --body-file report.md

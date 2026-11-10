@@ -75,10 +75,13 @@ The default answer is `/poteto-mode`, which runs most of the others when its ste
 | Have different models review a diff and try to break it | [`/interrogate`](../interrogate/SKILL.md) |
 | Fix a bug test-first when a cheap local test exists | [`/tdd`](../tdd/SKILL.md) |
 | Apply TypeScript rules to `.ts` or `.tsx` work | [`/typescript-best-practices`](../typescript-best-practices/SKILL.md) |
+| Remove code slop a branch added before commit: needless defensive checks, type escapes, deep nesting | [`/deslop`](../deslop/SKILL.md) |
 | Strip comments before review, using a reviewer that didn't write them | [`/no-comments`](../no-comments/SKILL.md) |
 | Clean AI tells out of prose | [`/unslop`](../unslop/SKILL.md) |
 | Write docs, an RFC, a README, a PR description, or a commit message to a standard | [`/technical-writing`](../technical-writing/SKILL.md) |
 | Hear the last reply again in plain words | [`/bro`](../bro/SKILL.md) |
+| Drive a web, IDE, or Electron UI and capture evidence | [`/control-ui`](../control-ui/SKILL.md) |
+| Drive a CLI or TUI with a repeatable harness and capture evidence | [`/control-cli`](../control-cli/SKILL.md) |
 | Give agents a scripted way to drive the app and prove behavior | [`/create-verification-skill`](../create-verification-skill/SKILL.md) |
 | Bring a verification skill and its feature map back in line with the app | [`/maintain-verification-skill`](../maintain-verification-skill/SKILL.md) |
 | Formally verify a race, invariant, or other property that tests rarely reach | [`/create-formal-verification-skill`](../create-formal-verification-skill/SKILL.md) |
@@ -98,6 +101,8 @@ If a skill directory next to this one is missing from the table, read its frontm
 Close calls:
 
 - `/how` explains what the code does. `/why` explains the reasons. `/teach` runs one or both and explains the result plainly.
+- `/deslop` edits the code a branch added. `/no-comments` handles its comments, and `/unslop` handles prose.
+- `/control-ui` and `/control-cli` drive the app once, for this change. `/create-verification-skill` writes a lasting skill for one repository.
 - `/arena` gives every worker the same brief and merges the best parts. `/swarm` splits work into slices or a race and returns one report.
 - `/architect` implements right after it settles the design. Add "with checkpoint" to review the design before it writes code.
 - `/interrogate` reviews the diff. `/blast-radius` looks for breakage outside the diff and proves the one fact that makes the change safe.
@@ -106,7 +111,7 @@ Close calls:
 
 Not in pstack:
 
-- pstack has no `/deslop` and no skill that drives a browser or a terminal. `/unslop` and `/no-comments` clean text and comments, and `drive-app` in the adapter says how to drive an app.
+- pstack has no skill that drives a native desktop window. `drive-app` in the adapter says how this environment does it.
 - Loops and skill authoring come from the harness. Its adapter's For users section names them, and `author-skill` resolves skill authoring. The Authoring a skill playbook covers the rest.
 - pstack has no `/orchestrate` skill. Orchestrate is a `/poteto-mode` playbook. If the slash menu shows `/orchestrate`, another plugin provides it.
 
