@@ -1,6 +1,6 @@
 # resolve-capability design
 
-Status: implemented. `skills/resolve-capability/` holds the index and references, every skill and playbook names capabilities, `scripts/lint-rewritten.mjs` keeps product names out of them, and `orca-harness` is gone. The tables below are the first draft: where a skill or a reference file differs, that file is right. Cells marked `?` are not checked yet.
+Status: superseded by [`harness-adapters-design.md`](harness-adapters-design.md), which split this single adapter into a contract and one adapter per product. Read this file as history. It was implemented: every skill and playbook names capabilities, `scripts/lint-rewritten.mjs` keeps product names out of them, and `orca-harness` is gone. The tables below are the first draft: where a skill or a reference file differs, that file is right. Cells marked `?` are not checked yet.
 
 ## Problem
 

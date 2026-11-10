@@ -1,6 +1,6 @@
 # select-model design
 
-Status: implemented. `setup-pstack`, `create-model-selection-skill`, and the `poteto-mode` Subagents section follow this design. The results of the checks are at the end. Where the design and a skill differ, the skill is right.
+Status: implemented, then reshaped by phase 3 of [`harness-adapters-design.md`](harness-adapters-design.md): the per-product facts the generator used now live in each adapter's Survey section. Where this file names a product's facts, the adapter is right. `setup-pstack`, `create-model-selection-skill`, and the `poteto-mode` Subagents section follow this design. The results of the checks are at the end. Where the design and a skill differ, the skill is right.
 
 ## Problem
 
