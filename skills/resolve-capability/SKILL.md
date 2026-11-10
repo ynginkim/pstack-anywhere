@@ -8,14 +8,14 @@ disable-model-invocation: true
 
 A pstack step names what it needs by a capability name in backticks, such as `spawn-worker`. It does not name a tool. This skill says how to find the tool that does it here. The skills that name capabilities live next to this one, so read this file as `../resolve-capability/SKILL.md`.
 
-This file names no product. The mechanisms live in [`adapters/`](adapters/), one folder per product, each with an `adapter.md`. A harness adapter covers the agent a session runs in. An environment adapter covers a layer that runs on top of harnesses and adds to them. This file holds the vocabulary, the rules for choosing among the adapters' mechanisms, and what to do when no adapter has one.
+This file names no product. The mechanisms live in [`adapters/`](adapters/), one folder per product, each with an `adapter.md`. A harness adapter covers the agent a session runs in. An environment adapter covers a layer that runs on top of harnesses and adds to them. This file holds the vocabulary, the rules for choosing among the adapters' mechanisms, and what to do when no adapter has one. A new adapter starts from [`references/adapter-template.md`](references/adapter-template.md).
 
 ## 1. Which environment is this
 
 Answer these as separate questions. They are not alternatives. A session runs in exactly one harness and in any number of environments.
 
 1. **Which environments are here?** Run `sh <folder of this file>/scripts/detect.sh` now, before you plan or start anything, and also when the task says to plan only. It prints the id of each environment adapter whose check answers yes. Read `adapters/<id>/adapter.md` for each id it prints. Do not decide this from the harness you are, from `which`, or from memory, and do not put the check off to a later step. No output means no environment: read [`references/plain.md`](references/plain.md).
-2. **Which harness are you?** Your own tool list and instructions tell you. Read the harness adapter in `adapters/` whose Detect section matches you. When none matches, pstack has no adapter for your harness. Use the fallbacks in the index and say so once.
+2. **Which harness are you?** Your own tool list and instructions tell you. Read the harness adapter in `adapters/` whose Detect section matches you now, in the same step as the environment adapters, also when the task plans no spawn. Most capabilities have the `own harness` scope, so that adapter answers them, `track-todos` and `ask-user` included. When none matches, pstack has no adapter for your harness. Use the fallbacks in the index and say so once.
 3. **This computer and this user.** `~/.agents/skills/select-model/SKILL.md` records which products and models are installed, which environments exist, and what the user prefers. Read it too. When it is missing, say so once and use the defaults in `../poteto-mode/SKILL.md`.
 
 ## 2. How to use the index

@@ -65,7 +65,17 @@ Your tool list, or `codex mcp list`. Seen on 2026-10-27 with Codex 0.160.1: Code
 - Skills documentation: https://developers.openai.com/codex/skills
 - `$skill-creator` writes skills, `/plan` plans before edits, and the Codex app has scheduled tasks.
 
+## Survey
+
+- **Installed.** `codex` on `PATH`.
+- **Models and efforts.** `models_cache.json` in `CODEX_HOME` (`~/.codex/models_cache.json` unless something set it) lists them: `models[].slug`, `display_name`, `supported_reasoning_levels`, and `default_reasoning_level`. `visibility` marks a model that is hidden from the picker. Running in Codex, read `spawn_agent`'s schema for the models and efforts it accepts. If you cannot tell, ask the user to paste the model names.
+- **Skill folder.** No link is needed. The `skills` CLI installs a skill for Codex into `~/.agents/skills/` itself, with nothing in `~/.codex/skills/`, so Codex reads `~/.agents/skills/` directly.
+- **Model pin.** `config.toml` in `CODEX_HOME`, and the project's `.codex/config.toml`. Seen on 2026-11-09: top-level `model` and `model_reasoning_effort`.
+- **Suited to.** pstack names no kind of work for Codex. Offer its models with no default.
+- **Not yet checked.** A Codex session with no environment, and Codex starting its own models with `spawn_agent`, were not run. Say `not verified here` for them.
+
 ## Limits
 
+- Each rollout under `find-sessions` carries a `rate_limits` record: `primary.used_percent`, `primary.window_minutes`, `primary.resets_at`, and `credits`. It is the value at the end of a turn in an earlier session, so it can be hours or days old. Use it as a hint, never as the reason to pick a model. A limit shows up as an error when a start fails, so handle it then.
 - Codex may ignore `disable-model-invocation`, so a slash-only skill can trigger on its own (unverified).
 - Codex running on its own, outside an environment, has not been run for this fork as the session you run in.
