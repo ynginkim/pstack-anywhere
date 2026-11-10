@@ -49,4 +49,5 @@ if (other.length) {
   console.log('A new or changed file here has not been through the capability rewrite. Decide whether to bring it in, and if so rewrite it before it lands.\n')
   console.log(table(other) + '\n')
 }
-console.log('Compare locally: `git diff ' + old.slice(0, 7) + ' ' + next.slice(0, 7) + '` on the `upstream` branch.')
+const short = (rev) => git('rev-parse', '--short', rev)
+console.log('Compare locally: `git diff ' + short(old) + ' ' + short(next) + '` on the `upstream` branch.')
