@@ -26,9 +26,9 @@ Remaining triggers:
 - Nontrivial multi-step → write the throughput checkpoint (Feature step 3).
 - Any prose surface, your reply to the user included → the **unslop** skill. Write the reply per **Writing the reply**. Agent-facing prose also follows the skill-authoring guidance that `author-skill` resolves to, or agentskills.io, and the Authoring a skill playbook.
 - Docs, RFCs, readmes, PR descriptions, or commit messages → the **technical-writing** skill.
-- Before commit → reread the diff and cut slop with the **unslop** and **no-comments** skills.
+- Before commit → the **deslop** skill.
 - Before review → the **no-comments** skill.
-- Shipping UI / IDE / CLI → drive the real thing with the tool your harness offers: a browser or app-control tool for web, Electron, and native UIs, and a terminal session you can type into and read for CLIs and TUIs. `drive-app` in `../resolve-capability/SKILL.md` lists the commands. For bug fixes, reproduce first on the same surface yourself. Hand to the user only under the narrow Bug fix step 1 exception.
+- Shipping UI / IDE / CLI → the matching control skill. **control-ui** covers browser, Electron, and web UIs, and **control-cli** covers CLIs and TUIs. Both drive the real thing with the tool `drive-app` resolves to here. A native window has no control skill, so drive it with `drive-app` directly. For bug fixes, reproduce first on the same surface yourself. Hand to the user only under the narrow Bug fix step 1 exception.
 - Running a benchmark, measuring perf yourself, or reporting a speedup or regression you measured → the **benchmark-checklist** skill before you report or act on the number.
 - Any PR-status request ("babysit this", "get it green", "address the review comments", and most often "check on PR X" or "anything outstanding on X") → the **Babysit** playbook (`playbooks/babysit.md`). Never triggered by merely opening a PR. Declare its mode before polling. The playbook's step 1 owns the request-to-mode mapping. Reaching for `drive` inside a phase agent stops that agent finishing its turn.
 - Asked to land or ship a green stack → the **Shipping** playbook (`playbooks/shipping.md`). Green is not safe. Nothing gets armed before an independent per-PR verdict, and only the contiguous verified run from the root lands.
