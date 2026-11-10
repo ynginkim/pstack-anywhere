@@ -16,7 +16,9 @@ if (!old || !next) {
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim()
 const root = git('rev-parse', '--show-toplevel')
 const { paths } = JSON.parse(readFileSync(join(root, 'scripts/rewritten.json'), 'utf8'))
-const rewritten = (file) => paths.some((p) => (p.endsWith('/') ? file.startsWith(p) : file === p))
+// The team-kit files under cursor-team-kit/ are only the ones this fork bundled (scripts/sync-upstream.sh), so each was rewritten here.
+const TEAM_KIT = 'cursor-team-kit/'
+const rewritten = (file) => file.startsWith(TEAM_KIT) || paths.some((p) => (p.endsWith('/') ? file.startsWith(p) : file === p))
 
 const cursorSha = (rev) => /@ ([0-9a-f]{6,})/.exec(git('log', '-1', '--format=%s', rev))?.[1]
 const from = cursorSha(old)
@@ -35,11 +37,11 @@ const ported = rows.filter((r) => rewritten(r.file))
 const other = rows.filter((r) => !rewritten(r.file))
 const table = (list) => ['| Change | File |', '| --- | --- |', ...list.map((r) => `| ${kind[r.status[0]] ?? r.status} | \`${r.file}\` |`)].join('\n')
 
-console.log(`Cursor changed pstack${from && to ? ` (\`${from}\` to \`${to}\`, [compare](https://github.com/cursor/plugins/compare/${from}...${to}))` : ''}. The \`upstream\` branch holds the new files. Nothing was merged into \`main\`.\n`)
+console.log(`Cursor changed pstack or the team-kit files this fork bundles${from && to ? ` (\`${from}\` to \`${to}\`, [compare](https://github.com/cursor/plugins/compare/${from}...${to}))` : ''}. The \`upstream\` branch holds the new files. Nothing was merged into \`main\`.\n`)
 console.log(`${rows.length} file(s) changed: ${ported.length} in paths this fork rewrote by hand, ${other.length} elsewhere.\n`)
 if (ported.length) {
   console.log('## Rewritten here: port the meaning\n')
-  console.log('Read the change on `upstream`, decide whether it still applies, and carry it into the rewritten file in capability names (see `MIRROR.md`).\n')
+  console.log('Read the change on `upstream`, decide whether it still applies, and carry it into the rewritten file in capability names (see `MIRROR.md`). A file under `cursor-team-kit/` maps to the same path without that prefix, and its `LICENSE` is copied into each bundled team-kit skill.\n')
   console.log(table(ported) + '\n')
 }
 if (other.length) {
