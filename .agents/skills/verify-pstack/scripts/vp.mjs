@@ -916,6 +916,7 @@ const loginShell = () => process.env.SHELL || (process.platform === 'darwin' ? '
 function pidStart(pid) {
   const p = spawnSync('ps', ['-o', 'lstart=', '-p', String(pid)], { encoding: 'utf8', env: { ...process.env, LC_ALL: 'C' } })
   if (p.error) return { state: 'unknown', why: `ps did not run: ${p.error.message}` }
+  if (p.signal || p.status === null) return { state: 'unknown', why: `ps was ended by ${p.signal ?? 'an unknown cause'}` }
   if (p.stderr.trim()) return { state: 'unknown', why: `ps exited ${p.status} saying ${oneLine(p.stderr, 200)}` }
   const start = p.stdout.trim()
   if (p.status === 0 && start) return { state: 'running', start }
@@ -928,8 +929,9 @@ function runLeader(r) {
   const s = pidStart(r.pid)
   if (s.state === 'unknown') return s
   if (s.state === 'absent') return { state: 'gone', why: `no process ${r.pid}` }
+  if (!r.pid_start) return { state: 'unknown', why: `process ${r.pid} is alive, but no start time was recorded at launch to tell it is the run's` }
   if (s.start === r.pid_start) return { state: 'running' }
-  return { state: 'gone', reused: true, why: `process ${r.pid} started ${s.start}, the run's started ${r.pid_start ?? 'at an unrecorded time'}` }
+  return { state: 'gone', reused: true, why: `process ${r.pid} started ${s.start}, the run's started ${r.pid_start}` }
 }
 
 // A script that starts the agent the way a shell Orca did not open would, and refuses to start it if any trace of Orca is left.
@@ -957,8 +959,7 @@ export PATH="$NEW"
   const markersLeft = headless ? `markers=$(${SESSION_MARKERS})\n` : ''
   // The rc files can set where the agent writes its record. vp searches there too (runHomes).
   const envFile = headless
-    ? `j() { local v="\${!1}"; v=\${v//\\\\/\\\\\\\\}; v=\${v//\\"/\\\\\\"}; printf '"%s": "%s"' "$1" "$v"; }
-printf '{%s, %s}\\n' "$(j CLAUDE_CONFIG_DIR)" "$(j CODEX_HOME)" > ${shq(path.join(runDir(r.id), 'headless-env.json'))}
+    ? `printf '%s\\0' "CLAUDE_CONFIG_DIR=$CLAUDE_CONFIG_DIR" "CODEX_HOME=$CODEX_HOME" > ${shq(path.join(runDir(r.id), 'headless-env'))}
 `
     : ''
   const markersCount = headless ? `, session markers left $(echo -n "$markers" | grep -c .)` : ''
@@ -1082,17 +1083,19 @@ function launch(args) {
 const receiptDetail = (launchData) => oneLine(launchData?.result?.receipt?.detail ?? JSON.stringify(launchData), 200)
 
 // A headless run's login shell can set CLAUDE_CONFIG_DIR or CODEX_HOME to a folder vp's environment does not name.
-// Its script writes the values it starts the agent with to headless-env.json, an empty string for an unset one.
+// Its script writes the values it starts the agent with to headless-env as NUL-ended NAME=value fields, since a path
+// can hold any byte but NUL. An unset value is written empty.
 function runHomes(r) {
-  const p = path.join(runDir(r.id), 'headless-env.json')
+  const p = path.join(runDir(r.id), 'headless-env')
   if (r.surface !== 'headless' || !exists(p)) return []
-  let env
-  try {
-    env = readJson(p)
-  } catch {
+  const name = r.agent === 'claude' ? 'CLAUDE_CONFIG_DIR' : 'CODEX_HOME'
+  const fields = fs.readFileSync(p, 'utf8').split('\0')
+  const field = fields.find((f) => f.startsWith(`${name}=`))
+  if (fields.pop() !== '' || !field) {
+    console.log(`could not read ${name} from ${p}, so vp searches only its usual folders for the record`)
     return []
   }
-  const v = env[r.agent === 'claude' ? 'CLAUDE_CONFIG_DIR' : 'CODEX_HOME']
+  const v = field.slice(name.length + 1)
   return v ? [path.resolve(r.testbed, v)] : []
 }
 
@@ -1319,7 +1322,7 @@ function stopGroup(r) {
   if (leader.state === 'unknown')
     return {
       unknown: true,
-      note: `process group ${r.pid}: still has members, but whether its leader is the run's is unknown (${leader.why}). Nothing signalled. Rerun vp cleanup where ps works`,
+      note: `process group ${r.pid}: still has members, but whether its leader is the run's is unknown (${leader.why}). Nothing signalled. Rerun vp cleanup when ps can tell, or once the group has exited`,
     }
   if (leader.reused) return { note: `process group ${r.pid}: ${leader.why}, so the pid belongs to another process now. Nothing signalled` }
   const errors = []
@@ -1358,13 +1361,20 @@ function cleanup(args) {
       const res = orca(['orchestration', 'worker-stop', '--dispatch', w.id])
       log.push(`worker ${w.id} (${w.state}/${w.stage}): ${res.ok ? 'stopped' : `stop failed ${oneLine(res.raw.stderr || res.raw.stdout, 200)}`}`)
     }
-  if (r.fakehome && exists(r.fakehome)) {
+  const held = []
+  if (stop?.unknown) {
+    if (r.fakehome && exists(r.fakehome)) held.push(`fake home ${r.fakehome}`)
+  } else if (r.fakehome && exists(r.fakehome)) {
     fs.cpSync(r.fakehome, path.join(dir, 'fakehome'), { recursive: true, verbatimSymlinks: true })
     fs.rmSync(r.fakehome, { recursive: true })
     log.push(`fake home ${r.fakehome}: copied to ${path.join(dir, 'fakehome')}, removed`)
   }
   const temps = (rec ? tmpDirs(rec, since) : []).filter((d) => !r.fakehome || path.resolve(d) !== path.resolve(r.fakehome))
   for (const d of temps) {
+    if (stop?.unknown) {
+      if (opt.tmp) held.push(`temp dir ${d}`)
+      continue
+    }
     if (!opt.tmp) {
       log.push(`temp dir ${d} was created after launch and named by the run. If it is the run's, rerun with --tmp to keep a copy and remove it`)
       continue
@@ -1378,7 +1388,8 @@ function cleanup(args) {
     const diff = sh('git', ['-C', TESTBED, 'diff']).stdout
     fs.writeFileSync(path.join(dir, 'testbed-residue.txt'), `${residue.join('\n')}\n\n${diff}`)
     log.push(`testbed residue saved to testbed-residue.txt: ${residue.join(' | ')}`)
-    if (opt.revert) {
+    if (opt.revert && stop?.unknown) held.push('the testbed revert')
+    else if (opt.revert) {
       for (const l of residue) {
         const f = l.slice(3)
         if (l.startsWith('??')) fs.rmSync(path.join(TESTBED, f), { recursive: true, force: true })
@@ -1387,6 +1398,7 @@ function cleanup(args) {
       log.push('testbed residue reverted')
     } else log.push('rerun with --revert to restore those testbed paths')
   }
+  if (held.length) log.push(`held because the run may still be running: ${held.join(', ')}. Rerun vp cleanup when ps can tell, or once the group has exited, to finish them`)
   const l = readLock()
   if (l && l.owner === r.owner && (l.placed || l.stash)) log.push('REMINDER: your select-model lock still has a sample placed or a stash pending. Run vp sm release when your last run is done')
   // A group left running because ps could not answer stays uncleaned, so a later cleanup can still stop it.
