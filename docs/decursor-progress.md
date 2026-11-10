@@ -192,7 +192,7 @@ The guide now describes this fork. The reader uses Claude Code, Codex, or Grok i
 | Plugin install, Custom Modes, the `/in-cloud` command, Cursor Projects, and the Cursor-only automation pack are gone | 01, 02, 07 |
 | A capability names section and a list of the 21 capabilities | 09 |
 | `.cursor/skills/` became `.agents/skills/` with a link from `.claude/skills/` | 01, 06 |
-| `/deslop` is gone, and the page says pstack has no code-slop skill | 05 |
+| `/deslop` is gone, and the page says pstack has no code-slop skill. Superseded on 2026-11-10, when page 05 began to route to the bundled `/deslop` | 05 |
 | Scheduling is `run-on-schedule`, with Claude Code, Orca, and the Codex desktop app named as options | 06, 07 |
 | Merging says `gh` and the exact steps, with no Origin forge | 06 |
 | The `auto` pitfall became "a model this computer can't reach" | 10 |
