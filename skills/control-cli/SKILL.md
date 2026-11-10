@@ -41,39 +41,41 @@ Exercise an interactive CLI with a repeatable harness instead of trying it by ha
 
 ## A minimal tmux harness
 
-`wait_for` polls the screen until a pattern appears, so no step waits a fixed time. It fails at once when the program has exited and taken its session with it. `capture-pane` drops trailing spaces, so match a prompt such as `> ` as `^>$`.
+Run it as one block. The subshell stops at the first failed step, and its `trap` kills the session however it ends. tmux names the session, so two harnesses started together never share one. `wait_for` polls the screen until a pattern appears, so no step waits a fixed time, and it fails at once when the program has exited and taken its session with it. `capture-pane` drops trailing spaces, so match a prompt such as `> ` as `^>$`.
 
 ```bash
-SESSION="cli-harness-$(date +%s)"
-wait_for() {
-  for _ in $(seq 100); do
-    screen=$(tmux capture-pane -pt "$SESSION") || return 1
-    grep -q -- "$1" <<<"$screen" && return 0
-    sleep 0.1
-  done
-  echo "timed out waiting for: $1" >&2
-  return 1
-}
-tmux new-session -d -s "$SESSION" -- <command-under-test>
-wait_for "<ready pattern>"
-tmux capture-pane -pt "$SESSION" > <scratch>/before.txt
-tmux send-keys -t "$SESSION" "help" Enter
-wait_for "<text the answer prints>"
-tmux capture-pane -pt "$SESSION" > <scratch>/after.txt
-tmux kill-session -t "$SESSION"
+(
+  set -euo pipefail
+  SESSION=$(tmux new-session -d -P -F '#{session_id}' -- <command-under-test>)
+  trap 'tmux kill-session -t "$SESSION" 2>/dev/null || true' EXIT
+  wait_for() {
+    for _ in $(seq 100); do
+      screen=$(tmux capture-pane -pt "$SESSION") || return 1
+      grep -q -- "$1" <<<"$screen" && return 0
+      sleep 0.1
+    done
+    echo "timed out waiting for: $1" >&2
+    return 1
+  }
+  wait_for "<ready pattern>"
+  tmux capture-pane -pt "$SESSION" > <scratch>/before.txt
+  tmux send-keys -t "$SESSION" "help" Enter
+  wait_for "<pattern the answer prints>"
+  tmux capture-pane -pt "$SESSION" > <scratch>/after.txt
+)
 ```
 
-For a Node CLI:
+For a Node CLI, set the inspector in the session's own environment. A variable put in front of `tmux` does not reach the program when a tmux server is already running.
 
 ```bash
-NODE_OPTIONS="--inspect=127.0.0.1:0" tmux new-session -d -s "$SESSION" -- <node-cli-command>
+SESSION=$(tmux new-session -d -P -F '#{session_id}' -e 'NODE_OPTIONS=--inspect=127.0.0.1:0' -- <node-cli-command>)
 ```
 
 Read the inspector URL from the terminal output, then profile with a tool that speaks the Chrome DevTools Protocol.
 
 ## A minimal PTY harness
 
-Use a PTY script when you need exact waits and the repository has no `tmux` or demo harness. Keep it temporary unless the user asks for a reusable test.
+Use a PTY script when you need exact waits and the repository has no `tmux` or demo harness. Keep it temporary unless the user asks for a reusable test. A PTY carries terminal escape codes such as `ESC[3G`, so pick a pattern they cannot contain, such as `b"\r\n3\r\n"` rather than `b"3"`.
 
 ```python
 import os
@@ -81,6 +83,26 @@ import pty
 import select
 import subprocess
 import time
+
+
+def read_until(fd, pattern, timeout=30):
+    buffer = b""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        ready, _, _ = select.select([fd], [], [], 0.25)
+        if not ready:
+            continue
+        try:
+            chunk = os.read(fd, 4096)
+        except OSError:
+            chunk = b""
+        if not chunk:
+            break
+        buffer += chunk
+        if pattern in buffer:
+            return buffer
+    raise RuntimeError(f"never saw {pattern!r}. Output so far: {buffer.decode(errors='replace')}")
+
 
 master_fd, slave_fd = pty.openpty()
 proc = subprocess.Popen(
@@ -92,21 +114,14 @@ proc = subprocess.Popen(
 )
 os.close(slave_fd)
 
-deadline = time.time() + 30
-buffer = b""
-while time.time() < deadline:
-    ready, _, _ = select.select([master_fd], [], [], 0.25)
-    if not ready:
-        continue
-    chunk = os.read(master_fd, 4096)
-    buffer += chunk
-    if b"<ready text>" in buffer:
-        os.write(master_fd, b"help\n")
-        break
-
-print(buffer.decode(errors="replace"))
-proc.terminate()
-os.close(master_fd)
+try:
+    print(read_until(master_fd, b"<ready text>").decode(errors="replace"))
+    os.write(master_fd, b"help\n")
+    print(read_until(master_fd, b"<text the answer prints>").decode(errors="replace"))
+finally:
+    proc.terminate()
+    proc.wait(timeout=5)
+    os.close(master_fd)
 ```
 
 If the CLI needs richer terminal control, use `pty.fork()` or a PTY library the project already has.
