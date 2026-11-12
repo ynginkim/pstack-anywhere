@@ -10,7 +10,7 @@ Answer the user's question about pstack, hand them a prompt they can send, and l
 
 A message that asks for work, such as "use pstack to fix this bug", is not a help question. Read [`poteto-mode`](../poteto-mode/SKILL.md), do the work under it, and mention once that `/poteto-mode` stays in context until the chat is compacted.
 
-This file maps questions to the skills and guide pages that hold the answers. Those files own the details. Read the file you route to before you quote it, and trust it when it disagrees with this map. The links here point into the installed skills, which the user may not be able to open, and `docs/` is not installed at all, so give the user the file's public copy: `https://github.com/ynginkim/pstack-orca/blob/main/` followed by its path from the repository root (`skills/<name>/SKILL.md`, `docs/guide/<page>.md`).
+This file maps questions to the skills and guide pages that hold the answers. Those files own the details. Read the file you route to before you quote it, and trust it when it disagrees with this map. The links here point into the installed skills, which the user may not be able to open, and `docs/` is not installed at all, so give the user the file's public copy: `https://github.com/ynginkim/pstack-anywhere/blob/main/` followed by its path from the repository root (`skills/<name>/SKILL.md`, `docs/guide/<page>.md`).
 
 ## Find out what they need
 
@@ -35,7 +35,7 @@ When `select-model` is missing and it matters, ask whether the user wants to set
 
 ## Get set up
 
-1. Install the skills for the user's harnesses: `npx skills add ynginkim/pstack-orca -g -s '*' -y`, with one `-a <id>` for each harness. The For users section of each harness adapter in [`resolve-capability/adapters/`](../resolve-capability/adapters/) gives its id, where it reads skills, and how a skill runs there. Start a new session afterwards.
+1. Install the skills for the user's harnesses: `npx skills add ynginkim/pstack-anywhere -g -s '*' -y`, with one `-a <id>` for each harness. The For users section of each harness adapter in [`resolve-capability/adapters/`](../resolve-capability/adapters/) gives its id, where it reads skills, and how a skill runs there. Start a new session afterwards.
 2. Run [`/setup-pstack`](../setup-pstack/SKILL.md). It surveys this computer, asks five questions about budget and model preferences, and writes the `select-model` skill. Every skill reads it at the start of a task. Then it offers once each to generate a verification skill and a formal verification skill for the project, unless the project already has one.
 3. Start a real task with `/poteto-mode`, a goal, and a check that can pass or fail.
 

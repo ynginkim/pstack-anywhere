@@ -63,7 +63,7 @@ If the check fails, Orca renamed or removed a command or flag. Fix every referen
 To run this weekly without remembering, create an Orca automation from inside this repo's Orca worktree:
 
 ```bash
-orca automations create --name pstack-orca-sync --trigger weekly --day 1 --time 09:00 \
+orca automations create --name pstack-anywhere-sync --trigger weekly --day 1 --time 09:00 \
   --provider claude --workspace current \
   --prompt "Follow the Orca upstream section of MIRROR.md. Push only if both checks pass; otherwise report what failed."
 ```

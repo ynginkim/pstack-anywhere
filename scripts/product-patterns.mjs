@@ -7,7 +7,7 @@ import { join } from 'node:path'
 
 export const PRODUCT_PATTERNS = [
   [/\b(spawn_agent|spawn_subagent|AskUserQuestion|TodoWrite|update_plan|run_in_background|subagent_type|skill-creator|SendMessage|TaskStop|CronCreate|ScheduleWakeup|worker-(start|show|read|stop|release))\b/, 'a harness tool or Orca command'],
-  [/(?<!pstack-)\borca\b|\bORCA_/i, 'Orca'],
+  [/\borca\b|\bORCA_/i, 'Orca'],
   [/\bClaude\b|\bCodex\b|\bGrok\b/i, 'an agent product'],
   [/`(Agent|Explore|Plan)`|\bAgent tool\b/, 'a harness tool'],
   [/\.(claude|grok)\/|\bCLAUDE\.md\b|\bAGENTS\.md\b|\$CLAUDE_CONFIG_DIR|\$CODEX_HOME|~\/\.(claude|codex|grok)\b/, 'a product path'],
@@ -16,7 +16,7 @@ export const PRODUCT_PATTERNS = [
 export const CONTRACT = 'skills/resolve-capability/'
 export const ADAPTERS = 'skills/resolve-capability/adapters/'
 
-// All of skills/ outside the adapters. The repository's own name, pstack-orca, is not a product name.
+// All of skills/ outside the adapters.
 export const PRODUCT_FREE = ['skills/']
 
 export const inProductScope = (file) => PRODUCT_FREE.some((x) => file.startsWith(x))
