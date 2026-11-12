@@ -13,7 +13,7 @@ This fork was checked in terminals and in Orca. How the skills behave inside the
 Run this once, from any folder:
 
 ```bash
-npx skills add ynginkim/pstack-orca -g -a claude-code -a codex -a grok -s '*' -y
+npx skills add ynginkim/pstack-anywhere -g -a claude-code -a codex -a grok -s '*' -y
 ```
 
 It installs every pstack skill globally for the three products. The real copies sit in `~/.agents/skills/`, and Claude Code and Grok see them through links.
